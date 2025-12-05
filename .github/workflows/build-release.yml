@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
       - name: Checkout code
@@ -44,7 +46,6 @@ jobs:
         with:
           files: app/build/outputs/apk/debug/easy-wakeword.apk
           generate_release_notes: true
-          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -60,6 +61,5 @@ jobs:
             Download the APK below to install the app.
           files: app/build/outputs/apk/debug/easy-wakeword.apk
           prerelease: false
-          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
