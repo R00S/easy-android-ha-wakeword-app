@@ -12,6 +12,20 @@
 
 ---
 
+## 📥 Download
+
+<p align="center">
+  <a href="https://github.com/R00S/easy-android-ha-wakeword-app/releases/latest/download/easy-wakeword.apk">
+    <img src="https://img.shields.io/badge/Download-APK-brightgreen?style=for-the-badge&logo=android" alt="Download APK"/>
+  </a>
+</p>
+
+**[⬇️ Download Latest APK](https://github.com/R00S/easy-android-ha-wakeword-app/releases/latest/download/easy-wakeword.apk)**
+
+> 💡 You may need to enable "Install from unknown sources" in your Android settings to install the APK.
+
+---
+
 ## 🎯 What This Does
 
 This helper app provides a **5-step wizard** that configures your Android device to:
@@ -26,6 +40,7 @@ This helper app provides a **5-step wizard** that configures your Android device
 
 ## 📋 Table of Contents
 
+- [Download](#-download)
 - [Features](#-features)
 - [Requirements](#-requirements)
 - [Quick Start](#-quick-start)
@@ -73,7 +88,7 @@ This helper app provides a **5-step wizard** that configures your Android device
 
 ## 🚀 Quick Start
 
-1. **Install** this app on your Android device
+1. **[Download the APK](https://github.com/R00S/easy-android-ha-wakeword-app/releases/latest/download/easy-wakeword.apk)** and install it on your Android device
 2. **Open** the app and follow the 5-step wizard
 3. **Say** "Hey Mycroft" — Home Assistant Assist will open!
 
