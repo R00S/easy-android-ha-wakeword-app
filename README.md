@@ -1,158 +1,447 @@
 # Easy Android HA Wakeword App
 
-A minimal-tap Android helper app for setting up always-on wake word detection to trigger Home Assistant Assist.
+[![Android](https://img.shields.io/badge/Android-7.0%2B-green.svg)](https://developer.android.com)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Compatible-41BDF5.svg)](https://www.home-assistant.io/)
 
-## Overview
+> **Transform any old Android phone or tablet into an always-listening wake word device for Home Assistant Assist — with zero typing required.**
 
-This app provides a simple wizard to configure:
-- **Hotword Plugin** - For always-on wake word detection
-- **Automate** - For automation flow handling
-- **Home Assistant** - Opens Assist when wake word is detected
+<p align="center">
+  <img src="docs/wizard-preview.png" alt="Setup Wizard Preview" width="300"/>
+</p>
 
-No typing required - just follow the prompts!
+---
 
-## Prerequisites
+## 🎯 What This Does
 
-- Android 7.0+ (API level 24+)
-- [Home Assistant Companion App](https://play.google.com/store/apps/details?id=io.homeassistant.companion.android) installed and configured
+This helper app provides a **5-step wizard** that configures your Android device to:
 
-## Setup Steps (Tap-by-Tap Sequence)
+1. **Listen** for the wake word "Hey Mycroft" (always-on, using minimal battery)
+2. **Trigger** Home Assistant Assist when the wake word is detected
+3. **Stay running** reliably in the background with no user intervention
+
+**No typing, no configuration files, no command line** — just tap through the wizard and you're done!
+
+---
+
+## 📋 Table of Contents
+
+- [Features](#-features)
+- [Requirements](#-requirements)
+- [Quick Start](#-quick-start)
+- [Detailed Setup Guide](#-detailed-setup-guide)
+- [How It Works](#-how-it-works)
+- [Building From Source](#-building-from-source)
+- [Configuration](#-configuration)
+- [Troubleshooting](#-troubleshooting)
+- [For Developers](#-for-developers)
+- [Alternative Approaches](#-alternative-approaches)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+---
+
+## ✨ Features
+
+| Feature | Description |
+|---------|-------------|
+| 🎙️ **Always-On Listening** | Wake word detection runs continuously in the background |
+| 🏠 **Home Assistant Integration** | Opens HA Assist directly when triggered |
+| 📱 **One-Tap Setup** | Wizard guides you through every step |
+| 🔋 **Battery Optimized** | Uses efficient wake word detection via Hotword Plugin |
+| 🔒 **On-Device Processing** | All wake word detection happens locally — no cloud required |
+| ⚡ **No Typing Required** | Perfect for wall-mounted tablets or dedicated devices |
+
+---
+
+## 📱 Requirements
+
+### Hardware
+- Android phone or tablet (great for repurposing old devices!)
+- Built-in or external microphone
+
+### Software
+- **Android 7.0** (Nougat) or later — API level 24+
+- [Home Assistant Companion App](https://play.google.com/store/apps/details?id=io.homeassistant.companion.android) — installed and signed in
+- Internet connection to Home Assistant (local network is fine)
+
+### Third-Party Apps (installed via wizard)
+- [Hotword Plugin](https://play.google.com/store/apps/details?id=com.pocketsphinx.hotword) — for wake word detection
+- [Automate](https://play.google.com/store/apps/details?id=com.llamalab.automate) — for automation flow handling
+
+---
+
+## 🚀 Quick Start
+
+1. **Install** this app on your Android device
+2. **Open** the app and follow the 5-step wizard
+3. **Say** "Hey Mycroft" — Home Assistant Assist will open!
+
+That's it! The wizard handles all the configuration automatically.
+
+---
+
+## 📖 Detailed Setup Guide
 
 ### Step 1: Install Hotword Plugin
-Tap "Install Hotword Plugin" to open Play Store and install [Hotword Plugin](https://play.google.com/store/apps/details?id=com.pocketsphinx.hotword).
+
+<img align="right" src="docs/step1.png" alt="Step 1" width="200"/>
+
+Tap **"Install Hotword Plugin"** to open the Play Store.
+
+**What it does:** Hotword Plugin provides efficient, always-on wake word detection. It runs in the background and listens for your configured wake word.
+
+> 💡 **Tip:** After installing, grant microphone permissions when prompted.
+
+<br clear="right"/>
+
+---
 
 ### Step 2: Install Automate
-Tap "Install Automate" to open Play Store and install [Automate](https://play.google.com/store/apps/details?id=com.llamalab.automate).
 
-### Step 3: Import Automate Flow
-Tap "Import Flow" to import the bundled wake word flow into Automate. This flow:
-- Listens for wake word detection from Hotword Plugin
-- Opens Home Assistant Assist when triggered
-- Runs as a foreground service for reliability
+<img align="right" src="docs/step2.png" alt="Step 2" width="200"/>
+
+Tap **"Install Automate"** to open the Play Store.
+
+**What it does:** Automate is a powerful automation app that responds to wake word detections and launches Home Assistant Assist.
+
+<br clear="right"/>
+
+---
+
+### Step 3: Import the Automate Flow
+
+<img align="right" src="docs/step3.png" alt="Step 3" width="200"/>
+
+Tap **"Import Flow"** to import the pre-configured automation.
+
+**What happens:**
+- The bundled `.flo` file is shared to Automate
+- Automate opens with the import dialog
+- Tap **"Import"** in Automate to confirm
+
+<br clear="right"/>
+
+---
 
 ### Step 4: Enable the Flow
-Tap "Open Automate" and toggle on the "HA Wake Word" flow.
 
-### Step 5: Load Wake Word Model
-Tap "Import Wake Word Model" to load the "Hey Mycroft" model into Hotword Plugin. Then enable it in Hotword Plugin settings.
+<img align="right" src="docs/step4.png" alt="Step 4" width="200"/>
+
+Tap **"Open Automate"** and enable the "HA Wake Word" flow.
+
+**In Automate:**
+1. Find "HA Wake Word" in your flows list
+2. Tap the flow to open it
+3. Tap the **▶️ Start** button to enable it
+
+> ⚠️ **Important:** Enable "Run on system startup" in Automate settings so it survives reboots.
+
+<br clear="right"/>
+
+---
+
+### Step 5: Load the Wake Word Model
+
+<img align="right" src="docs/step5.png" alt="Step 5" width="200"/>
+
+Tap **"Import Wake Word Model"** to load "Hey Mycroft" into Hotword Plugin.
+
+**In Hotword Plugin:**
+1. Accept the imported model
+2. Enable the "Hey Mycroft" wake word
+3. Start the listening service
+
+<br clear="right"/>
+
+---
 
 ### Step 6: Disable Battery Optimization
-For reliable always-on detection, disable battery optimization for:
-- Hotword Plugin
-- Automate
-- Home Assistant Companion
 
-## Home Assistant Intent/Deeplink Constants
+For reliable always-on operation, disable battery optimization for:
+
+| App | Why |
+|-----|-----|
+| **Hotword Plugin** | Keeps wake word detection running |
+| **Automate** | Keeps automation flows active |
+| **Home Assistant** | Ensures quick response |
+
+**How to disable:**
+1. Go to **Settings → Apps → [App Name] → Battery**
+2. Select **"Don't optimize"** or **"Unrestricted"**
+
+---
+
+## ⚙️ How It Works
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Your Android Device                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│   ┌─────────────────┐                                            │
+│   │  Hotword Plugin │ ──── Listens for "Hey Mycroft"             │
+│   └────────┬────────┘                                            │
+│            │                                                      │
+│            │ Broadcasts: com.pocketsphinx.hotword.DETECTED       │
+│            ▼                                                      │
+│   ┌─────────────────┐                                            │
+│   │    Automate     │ ──── Receives broadcast, runs flow         │
+│   └────────┬────────┘                                            │
+│            │                                                      │
+│            │ Intent: android.intent.action.ASSIST                │
+│            ▼                                                      │
+│   ┌─────────────────┐                                            │
+│   │ Home Assistant  │ ──── Opens Assist screen                   │
+│   │   Companion     │                                            │
+│   └─────────────────┘                                            │
+│                                                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### The Automate Flow
+
+The bundled `.flo` file contains a simple but reliable flow:
+
+1. **Trigger:** Broadcast Receive block listening for `com.pocketsphinx.hotword.DETECTED`
+2. **Action:** Activity Start block launching Home Assistant Assist
+3. **Loop:** Returns to listening after each activation
+
+**Flow Settings:**
+- ✅ Foreground service (persistent notification)
+- ✅ No screen state gating (works with screen off)
+- ✅ No charging state gating (works on battery)
+- ❌ No headset gating (always listens)
+
+---
+
+## 🔨 Building From Source
+
+### Prerequisites
+
+| Requirement | Version |
+|-------------|---------|
+| Android Studio | Arctic Fox (2020.3.1) or later |
+| JDK | 17 |
+| Android SDK | 34 (compileSdk) |
+| Kotlin | 1.9.10 |
+
+### Clone and Build
+
+```bash
+# Clone the repository
+git clone https://github.com/R00S/easy-android-ha-wakeword-app.git
+cd easy-android-ha-wakeword-app
+
+# Build debug APK
+./gradlew assembleDebug
+
+# Build release APK
+./gradlew assembleRelease
+
+# Install directly to connected device
+./gradlew installDebug
+```
+
+### Output
+
+APK files are generated in:
+```
+app/build/outputs/apk/debug/app-debug.apk
+app/build/outputs/apk/release/app-release-unsigned.apk
+```
+
+### Project Structure
+
+```
+easy-android-ha-wakeword-app/
+├── app/
+│   ├── src/main/
+│   │   ├── java/com/roos/easywakeword/
+│   │   │   └── SetupWizardActivity.kt    # Main wizard UI
+│   │   ├── assets/
+│   │   │   ├── ha_wakeword.flo           # Automate flow
+│   │   │   └── hey_mycroft.tflite        # Wake word model
+│   │   ├── res/
+│   │   │   ├── layout/                   # XML layouts
+│   │   │   ├── values/                   # Strings, colors, themes
+│   │   │   └── drawable/                 # Icons and graphics
+│   │   └── AndroidManifest.xml
+│   └── build.gradle
+├── build.gradle
+├── settings.gradle
+└── README.md
+```
+
+---
+
+## 🔧 Configuration
+
+### Home Assistant Intent Constants
+
+Use these values if you're customizing the Automate flow or building your own integration:
 
 | Constant | Value |
 |----------|-------|
-| HA Package | `io.homeassistant.companion.android` |
-| Assist Action | `android.intent.action.ASSIST` |
-| Main Activity | `io.homeassistant.companion.android.launch.LaunchActivity` |
-| Assist Deeplink | `homeassistant://assist` |
+| **Package** | `io.homeassistant.companion.android` |
+| **Assist Action** | `android.intent.action.ASSIST` |
+| **Main Activity** | `io.homeassistant.companion.android.launch.LaunchActivity` |
+| **Assist Deeplink** | `homeassistant://assist` |
 
-### Example Intent for Automate
+### Automate Intent Block Settings
 
-```
+```yaml
 Action: android.intent.action.ASSIST
 Package: io.homeassistant.companion.android
 ```
 
 ### Alternative: Direct Activity Launch
 
-```
+```yaml
 Action: android.intent.action.MAIN
 Package: io.homeassistant.companion.android
 Class: io.homeassistant.companion.android.launch.LaunchActivity
 ```
 
-### Webhook Fallback (for advanced users)
+### Webhook Fallback (Advanced)
 
-If the HA app isn't responding to intents, you can trigger via webhook:
+If the HA app doesn't respond to intents, use a webhook:
+
+```yaml
+Method: POST
+URL: https://your-ha-instance/api/webhook/{webhook_id}
 ```
-POST https://your-ha-instance/api/webhook/{webhook_id}
+
+Configure the webhook in Home Assistant's `configuration.yaml`:
+```yaml
+automation:
+  - alias: "Wake Word Webhook"
+    trigger:
+      - platform: webhook
+        webhook_id: your_webhook_id
+    action:
+      - service: assist_pipeline.run
+        data:
+          start_stage: stt
 ```
 
-## Automate Flow Behavior
+---
 
-The bundled `.flo` file implements:
+## 🔍 Troubleshooting
 
-1. **Trigger**: Broadcast receiver for `com.pocketsphinx.hotword.DETECTED`
-2. **Action**: Launch Home Assistant Assist via intent
-3. **Fallback**: Open HA main activity if Assist intent fails
-4. **Settings**:
-   - Foreground service notification (stays alive)
-   - No screen/headset/charging gating (always active)
-   - Optional webhook block (disabled by default)
+### Wake Word Not Detecting
 
-## Wake Word Models
+| Issue | Solution |
+|-------|----------|
+| Hotword Plugin not running | Check for persistent notification; restart the service |
+| Model not loaded | Re-import the wake word model in Hotword Plugin |
+| Microphone permission denied | Grant mic permission in app settings |
+| Battery optimization killing service | Disable battery optimization for Hotword Plugin |
 
-The app bundles a placeholder for the "Hey Mycroft" model. For production use, download the actual model from:
-- [OpenWakeWord Project](https://github.com/dscripka/openWakeWord)
-- [Mycroft Precise](https://github.com/MycroftAI/mycroft-precise)
+### Home Assistant Not Opening
 
-Supported wake words (via OpenWakeWord):
+| Issue | Solution |
+|-------|----------|
+| HA Companion not installed | Install from Play Store |
+| Not signed in to HA | Open HA app and complete sign-in |
+| Automate flow not running | Enable the "HA Wake Word" flow in Automate |
+| Wrong intent configuration | Verify intent settings match documentation |
+
+### Automation Stops After Reboot
+
+1. **Enable "Run on system startup"** in Automate settings
+2. **Disable battery optimization** for Automate
+3. **Check for "App hibernation"** in Android settings (Android 12+)
+4. **Lock Automate in recent apps** (swipe down to lock)
+
+### Device-Specific Issues
+
+| Device/Manufacturer | Common Issue | Solution |
+|---------------------|--------------|----------|
+| Samsung | Aggressive battery optimization | Disable in Device Care |
+| Xiaomi/MIUI | Autostart blocked | Enable autostart in Security app |
+| Huawei/EMUI | App killed in background | Add to "Protected apps" |
+| OnePlus | Battery optimization | Disable in Battery settings |
+
+---
+
+## 👨‍💻 For Developers
+
+### App Permissions
+
+| Permission | Purpose | Required |
+|------------|---------|----------|
+| `POST_NOTIFICATIONS` | Show status notifications | Android 13+ only |
+| `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | Prompt for battery exemption | Optional |
+
+> **Note:** Microphone permission is requested by Hotword Plugin, not this app.
+
+### Wake Word Models
+
+The app includes a placeholder for the "Hey Mycroft" model. For production use, obtain actual models from:
+
+- [OpenWakeWord](https://github.com/dscripka/openWakeWord) — Modern, accurate models
+- [Mycroft Precise](https://github.com/MycroftAI/mycroft-precise) — Original Mycroft models
+
+**Supported wake words (OpenWakeWord):**
 - `hey_mycroft`
-- `ok_nabu`
+- `ok_nabu` (Home Assistant native)
 - `alexa`
 - `hey_jarvis`
 - `hey_rhasspy`
 
-## Building
+### Hotword Plugin Broadcast
 
-### Requirements
-- Android Studio Arctic Fox or later
-- JDK 17
-- Android SDK 34
+When a wake word is detected, Hotword Plugin sends:
 
-### Build Commands
-
-```bash
-# Debug build
-./gradlew assembleDebug
-
-# Release build
-./gradlew assembleRelease
-
-# Install on connected device
-./gradlew installDebug
+```java
+Intent intent = new Intent("com.pocketsphinx.hotword.DETECTED");
+intent.putExtra("keyword", "hey mycroft");
+sendBroadcast(intent);
 ```
 
-### Output
-APK files are generated in `app/build/outputs/apk/`
+---
 
-## Permissions
+## 🔄 Alternative Approaches
 
-| Permission | Purpose |
-|------------|---------|
-| `POST_NOTIFICATIONS` | Show status notifications (Android 13+) |
-| `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | Prompt for battery exemption |
+If this approach doesn't suit your needs, consider these alternatives:
 
-Note: Microphone permission is requested by Hotword Plugin, not this app.
+| Approach | Pros | Cons |
+|----------|------|------|
+| **[Wyoming Satellite on Termux](https://github.com/pantherale0/wyoming-satellite-termux)** | Full Wyoming protocol, more wake words | Requires Termux, command-line setup |
+| **[Home Assistant Assist](https://www.home-assistant.io/voice_control/)** | Native integration | Requires button press or Google/Alexa |
+| **[ESPHome Voice Assistant](https://esphome.io/components/voice_assistant.html)** | Dedicated hardware | Requires ESP32 device |
 
-## Troubleshooting
+---
 
-### Wake word not detecting
-1. Ensure Hotword Plugin is running (check notification)
-2. Verify the wake word model is loaded and enabled
-3. Check battery optimization is disabled
+## 🤝 Contributing
 
-### Home Assistant not opening
-1. Verify HA Companion app is installed
-2. Check Automate flow is enabled
-3. Try launching HA manually first
+Contributions are welcome! Please feel free to submit issues and pull requests.
 
-### Flow stops working
-1. Disable battery optimization for Automate
-2. Enable "Start on boot" in Automate settings
-3. Check for system "app hibernation" settings
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## Related Projects
+---
 
-- [Wyoming Satellite on Termux](https://github.com/pantherale0/wyoming-satellite-termux) - Alternative approach using Termux terminal
-- [OpenWakeWord](https://github.com/dscripka/openWakeWord) - Wake word models
-- [Home Assistant Companion](https://companion.home-assistant.io/) - HA Android app
+## 📄 License
 
-## License
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
-MIT License - See LICENSE file for details.
+---
+
+## 🙏 Acknowledgments
+
+- [Home Assistant](https://www.home-assistant.io/) — The amazing home automation platform
+- [Hotword Plugin](https://play.google.com/store/apps/details?id=com.pocketsphinx.hotword) — Efficient wake word detection
+- [Automate](https://llamalab.com/automate/) — Powerful Android automation
+- [OpenWakeWord](https://github.com/dscripka/openWakeWord) — Open source wake word models
+- [Wyoming Satellite on Termux](https://github.com/pantherale0/wyoming-satellite-termux) — Inspiration and reference
+
+---
+
+<p align="center">
+  Made with ❤️ for the Home Assistant community
+</p>
