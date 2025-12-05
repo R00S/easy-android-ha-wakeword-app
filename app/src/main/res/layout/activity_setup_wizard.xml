@@ -126,7 +126,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="32dp"
                 android:paddingHorizontal="32dp"
-                android:text="@string/step1_button_install"
+                android:text="@string/step1_button_grant"
                 app:cornerRadius="24dp" />
 
         </LinearLayout>
