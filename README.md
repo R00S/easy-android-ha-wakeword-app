@@ -20,9 +20,17 @@
   </a>
 </p>
 
-**[⬇️ Download Latest APK](https://github.com/R00S/easy-android-ha-wakeword-app/releases/latest/download/easy-wakeword.apk)**
+**[⬇️ Download Latest APK](https://github.com/R00S/easy-android-ha-wakeword-app/releases/latest/download/easy-wakeword.apk)** | **[All Releases](https://github.com/R00S/easy-android-ha-wakeword-app/releases)**
 
 > 💡 You may need to enable "Install from unknown sources" in your Android settings to install the APK.
+
+### First Release Setup
+
+To create the first release with the APK:
+1. Go to **Actions** tab → **Build and Release APK** → **Run workflow**
+2. Or push a version tag: `git tag v1.0.0 && git push origin v1.0.0`
+
+The workflow will automatically build and attach the APK to the release.
 
 ---
 
