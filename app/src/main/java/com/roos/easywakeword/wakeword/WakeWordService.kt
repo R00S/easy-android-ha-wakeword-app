@@ -38,7 +38,7 @@ class WakeWordService : Service() {
         private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
         private const val BUFFER_SIZE_IN_SHORTS = 1280
         
-        private const val DETECTION_THRESHOLD = 0.5f
+        private const val DETECTION_THRESHOLD = 0.05f
         private const val HOME_ASSISTANT_PACKAGE = "io.homeassistant.companion.android"
         
         // Track service running state
@@ -257,8 +257,13 @@ class WakeWordService : Service() {
                     // Predict wake word
                     val prediction = wakeWordModel?.predictWakeWord(floatBuffer) ?: 0f
                     
-                    if (prediction > DETECTION_THRESHOLD) {
+                    // Log all predictions above 0.01 for debugging
+                    if (prediction > 0.01f) {
                         Log.d(TAG, "Wake word prediction: $prediction (threshold: $DETECTION_THRESHOLD)")
+                    }
+                    
+                    if (prediction > DETECTION_THRESHOLD) {
+                        Log.i(TAG, "Wake word DETECTED! Score: $prediction")
                         onWakeWordDetected()
                     }
                 }
