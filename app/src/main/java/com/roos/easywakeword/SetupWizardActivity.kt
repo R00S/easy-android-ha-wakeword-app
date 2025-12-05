@@ -1,7 +1,8 @@
 package com.roos.easywakeword
 
-import android.content.ActivityNotFoundException
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -11,26 +12,28 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.FileProvider
+import androidx.core.content.ContextCompat
 import com.roos.easywakeword.databinding.ActivitySetupWizardBinding
-import java.io.File
-import java.io.FileOutputStream
+import com.roos.easywakeword.wakeword.WakeWordService
 
 class SetupWizardActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySetupWizardBinding
     private var currentStep = 1
-    private val totalSteps = 5
+    private val totalSteps = 3
 
-    // Package names
     companion object {
-        const val HOTWORD_PLUGIN_PACKAGE = "nl.jolanrensen.hotwordPlugin"
-        const val AUTOMATE_PACKAGE = "com.llamalab.automate"
         const val HOME_ASSISTANT_PACKAGE = "io.homeassistant.companion.android"
-        
-        // Asset file names
-        const val AUTOMATE_FLOW_FILE = "ha_wakeword.flo"
-        const val WAKEWORD_MODEL_FILE = "hey_mycroft.tflite"
+    }
+
+    private val microphonePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            updateStepUI()
+        } else {
+            showError(R.string.error_permission_denied)
+        }
     }
 
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -47,9 +50,15 @@ class SetupWizardActivity : AppCompatActivity() {
         requestNotificationPermission()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Update UI in case permissions or service state changed
+        updateStepUI()
+    }
+
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -59,14 +68,21 @@ class SetupWizardActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { goToPreviousStep() }
     }
 
+    private fun hasMicrophonePermission(): Boolean {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == 
+            PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun isServiceRunning(): Boolean {
+        return WakeWordService.isRunning(this)
+    }
+
     private fun updateStepUI() {
-        // Update step indicator dots
+        // Update step indicator dots (only show 3 dots now)
         val dots = listOf(
             binding.step1Dot,
             binding.step2Dot,
-            binding.step3Dot,
-            binding.step4Dot,
-            binding.step5Dot
+            binding.step3Dot
         )
         dots.forEachIndexed { index, dot ->
             dot.setBackgroundResource(
@@ -74,6 +90,10 @@ class SetupWizardActivity : AppCompatActivity() {
                 else R.drawable.step_indicator_inactive
             )
         }
+        
+        // Hide unused dots
+        binding.step4Dot.visibility = View.GONE
+        binding.step5Dot.visibility = View.GONE
 
         // Update back button visibility
         binding.btnBack.visibility = if (currentStep > 1) View.VISIBLE else View.INVISIBLE
@@ -83,55 +103,48 @@ class SetupWizardActivity : AppCompatActivity() {
             1 -> setupStep1()
             2 -> setupStep2()
             3 -> setupStep3()
-            4 -> setupStep4()
-            5 -> setupStep5()
-            6 -> setupComplete()
+            4 -> setupComplete()
         }
     }
 
     private fun setupStep1() {
         binding.tvStepTitle.text = getString(R.string.step1_title)
-        binding.tvStepDescription.text = getString(R.string.step1_description)
-        binding.btnAction.text = getString(R.string.step1_button_install)
-        binding.btnAction.visibility = View.VISIBLE
         binding.btnContinue.text = getString(R.string.button_continue)
-        binding.ivIcon.setImageResource(R.drawable.ic_download)
+        binding.ivIcon.setImageResource(R.drawable.ic_step_default)
+        binding.stepIndicator.visibility = View.VISIBLE
+        
+        if (hasMicrophonePermission()) {
+            binding.tvStepDescription.text = getString(R.string.step1_permission_granted)
+            binding.btnAction.visibility = View.GONE
+        } else {
+            binding.tvStepDescription.text = getString(R.string.step1_description)
+            binding.btnAction.text = getString(R.string.step1_button_grant)
+            binding.btnAction.visibility = View.VISIBLE
+        }
     }
 
     private fun setupStep2() {
         binding.tvStepTitle.text = getString(R.string.step2_title)
         binding.tvStepDescription.text = getString(R.string.step2_description)
-        binding.btnAction.text = getString(R.string.step2_button_install)
+        binding.btnAction.text = getString(R.string.step2_button_disable)
         binding.btnAction.visibility = View.VISIBLE
         binding.btnContinue.text = getString(R.string.button_continue)
-        binding.ivIcon.setImageResource(R.drawable.ic_download)
+        binding.ivIcon.setImageResource(R.drawable.ic_step_default)
     }
 
     private fun setupStep3() {
         binding.tvStepTitle.text = getString(R.string.step3_title)
-        binding.tvStepDescription.text = getString(R.string.step3_description)
-        binding.btnAction.text = getString(R.string.step3_button_import)
-        binding.btnAction.visibility = View.VISIBLE
-        binding.btnContinue.text = getString(R.string.button_continue)
         binding.ivIcon.setImageResource(R.drawable.ic_step_default)
-    }
-
-    private fun setupStep4() {
-        binding.tvStepTitle.text = getString(R.string.step4_title)
-        binding.tvStepDescription.text = getString(R.string.step4_description)
-        binding.btnAction.text = getString(R.string.step4_button_open)
-        binding.btnAction.visibility = View.VISIBLE
-        binding.btnContinue.text = getString(R.string.button_continue)
-        binding.ivIcon.setImageResource(R.drawable.ic_step_default)
-    }
-
-    private fun setupStep5() {
-        binding.tvStepTitle.text = getString(R.string.step5_title)
-        binding.tvStepDescription.text = getString(R.string.step5_description)
-        binding.btnAction.text = getString(R.string.step5_button_import)
-        binding.btnAction.visibility = View.VISIBLE
         binding.btnContinue.text = getString(R.string.button_done)
-        binding.ivIcon.setImageResource(R.drawable.ic_step_default)
+        
+        if (isServiceRunning()) {
+            binding.tvStepDescription.text = getString(R.string.step3_status_running)
+            binding.btnAction.text = getString(R.string.step3_button_stop)
+        } else {
+            binding.tvStepDescription.text = getString(R.string.step3_description)
+            binding.btnAction.text = getString(R.string.step3_button_start)
+        }
+        binding.btnAction.visibility = View.VISIBLE
     }
 
     private fun setupComplete() {
@@ -149,17 +162,24 @@ class SetupWizardActivity : AppCompatActivity() {
 
     private fun performStepAction() {
         when (currentStep) {
-            1 -> openPlayStore(HOTWORD_PLUGIN_PACKAGE)
-            2 -> openPlayStore(AUTOMATE_PACKAGE)
-            3 -> importAutomateFlow()
-            4 -> openAutomate()
-            5 -> importWakeWordModel()
-            6 -> openBatteryOptimizationSettings()
+            1 -> requestMicrophonePermission()
+            2 -> openBatteryOptimizationSettings()
+            3 -> toggleWakeWordService()
+            4 -> openBatteryOptimizationSettings()
         }
     }
 
     private fun goToNextStep() {
         if (currentStep <= totalSteps) {
+            // Validate current step before proceeding
+            when (currentStep) {
+                1 -> {
+                    if (!hasMicrophonePermission()) {
+                        showError(R.string.error_permission_denied)
+                        return
+                    }
+                }
+            }
             currentStep++
             updateStepUI()
         } else {
@@ -175,135 +195,41 @@ class SetupWizardActivity : AppCompatActivity() {
         }
     }
 
-    private fun openPlayStore(packageName: String) {
-        try {
-            // Try Play Store app first
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                data = Uri.parse("market://details?id=$packageName")
-                setPackage("com.android.vending")
-            }
-            startActivity(intent)
-        } catch (e: ActivityNotFoundException) {
-            // Fallback to web browser
-            try {
-                val webIntent = Intent(Intent.ACTION_VIEW).apply {
-                    data = Uri.parse("https://play.google.com/store/apps/details?id=$packageName")
-                }
-                startActivity(webIntent)
-            } catch (e: Exception) {
-                showError(R.string.error_install_failed)
-            }
-        }
+    private fun requestMicrophonePermission() {
+        microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
-    private fun importAutomateFlow() {
-        try {
-            val file = copyAssetToCache(AUTOMATE_FLOW_FILE)
-            val uri = FileProvider.getUriForFile(
-                this,
-                "${packageName}.fileprovider",
-                file
-            )
-
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/octet-stream")
-                setPackage(AUTOMATE_PACKAGE)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    private fun toggleWakeWordService() {
+        if (isServiceRunning()) {
+            WakeWordService.stop(this)
+        } else {
+            if (!hasMicrophonePermission()) {
+                showError(R.string.error_permission_denied)
+                return
             }
-            startActivity(intent)
-        } catch (e: Exception) {
-            // Try alternative import method
-            try {
-                val file = copyAssetToCache(AUTOMATE_FLOW_FILE)
-                val uri = FileProvider.getUriForFile(
-                    this,
-                    "${packageName}.fileprovider",
-                    file
-                )
-                
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "application/octet-stream"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    setPackage(AUTOMATE_PACKAGE)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                startActivity(intent)
-            } catch (e: Exception) {
-                showError(R.string.error_import_failed)
-            }
+            WakeWordService.start(this)
         }
-    }
-
-    private fun openAutomate() {
-        try {
-            val intent = packageManager.getLaunchIntentForPackage(AUTOMATE_PACKAGE)
-            if (intent != null) {
-                startActivity(intent)
-            } else {
-                openPlayStore(AUTOMATE_PACKAGE)
-            }
-        } catch (e: Exception) {
-            showError(R.string.error_import_failed)
-        }
-    }
-
-    private fun importWakeWordModel() {
-        try {
-            val file = copyAssetToCache(WAKEWORD_MODEL_FILE)
-            val uri = FileProvider.getUriForFile(
-                this,
-                "${packageName}.fileprovider",
-                file
-            )
-
-            // Try Hotword Plugin's import intent
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/octet-stream")
-                setPackage(HOTWORD_PLUGIN_PACKAGE)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            startActivity(intent)
-        } catch (e: Exception) {
-            // Fallback: try sharing the model file
-            try {
-                val file = copyAssetToCache(WAKEWORD_MODEL_FILE)
-                val uri = FileProvider.getUriForFile(
-                    this,
-                    "${packageName}.fileprovider",
-                    file
-                )
-
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "application/octet-stream"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    setPackage(HOTWORD_PLUGIN_PACKAGE)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                startActivity(intent)
-            } catch (e: Exception) {
-                showError(R.string.error_import_failed)
-            }
-        }
-    }
-
-    private fun copyAssetToCache(assetName: String): File {
-        // Validate asset name to prevent path traversal
-        require(!assetName.contains("..") && !assetName.contains("/") && !assetName.contains("\\")) {
-            "Invalid asset name"
-        }
-        val file = File(cacheDir, assetName)
-        if (!file.exists()) {
-            assets.open(assetName).use { input ->
-                FileOutputStream(file).use { output ->
-                    input.copyTo(output)
-                }
-            }
-        }
-        return file
+        // Small delay to let service state update
+        binding.btnAction.postDelayed({
+            updateStepUI()
+        }, 500)
     }
 
     private fun openBatteryOptimizationSettings() {
         try {
+            // Try to request exemption for this app specifically
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val pm = getSystemService(POWER_SERVICE) as PowerManager
+                if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                    return
+                }
+            }
+            
+            // Fallback to general battery optimization settings
             val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
             startActivity(intent)
         } catch (e: Exception) {

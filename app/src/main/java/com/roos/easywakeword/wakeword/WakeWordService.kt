@@ -1,0 +1,282 @@
+package com.roos.easywakeword.wakeword
+
+import android.Manifest
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
+import android.net.Uri
+import android.os.Build
+import android.os.IBinder
+import android.os.Process
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import com.roos.easywakeword.R
+import com.roos.easywakeword.SetupWizardActivity
+
+/**
+ * Foreground service that continuously listens for the wake word
+ * and launches Home Assistant Assist when detected.
+ */
+class WakeWordService : Service() {
+    
+    companion object {
+        private const val TAG = "WakeWordService"
+        private const val NOTIFICATION_ID = 1
+        private const val CHANNEL_ID = "wake_word_channel"
+        
+        private const val SAMPLE_RATE = 16000
+        private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
+        private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
+        private const val BUFFER_SIZE_IN_SHORTS = 1280
+        
+        private const val DETECTION_THRESHOLD = 0.5f
+        private const val HOME_ASSISTANT_PACKAGE = "io.homeassistant.companion.android"
+        
+        fun start(context: Context) {
+            val intent = Intent(context, WakeWordService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+        
+        fun stop(context: Context) {
+            context.stopService(Intent(context, WakeWordService::class.java))
+        }
+        
+        fun isRunning(context: Context): Boolean {
+            val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            @Suppress("DEPRECATION")
+            for (service in manager.getRunningServices(Int.MAX_VALUE)) {
+                if (WakeWordService::class.java.name == service.service.className) {
+                    return true
+                }
+            }
+            return false
+        }
+    }
+    
+    private var modelRunner: OnnxModelRunner? = null
+    private var wakeWordModel: WakeWordModel? = null
+    private var audioRecorderThread: AudioRecorderThread? = null
+    private var isListening = false
+    
+    override fun onCreate() {
+        super.onCreate()
+        Log.d(TAG, "Service created")
+        createNotificationChannel()
+    }
+    
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "Service started")
+        startForeground(NOTIFICATION_ID, createNotification())
+        startListening()
+        return START_STICKY
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d(TAG, "Service destroyed")
+        stopListening()
+    }
+    
+    override fun onBind(intent: Intent?): IBinder? = null
+    
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                getString(R.string.notification_channel_name),
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = getString(R.string.notification_channel_description)
+                setShowBadge(false)
+            }
+            
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+    
+    private fun createNotification(): Notification {
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, SetupWizardActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(getString(R.string.notification_title))
+            .setContentText(getString(R.string.notification_text))
+            .setSmallIcon(R.drawable.ic_launcher)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+    
+    private fun startListening() {
+        if (isListening) return
+        
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) 
+            != PackageManager.PERMISSION_GRANTED) {
+            Log.e(TAG, "RECORD_AUDIO permission not granted")
+            stopSelf()
+            return
+        }
+        
+        try {
+            modelRunner = OnnxModelRunner(assets)
+            wakeWordModel = WakeWordModel(modelRunner!!)
+            
+            audioRecorderThread = AudioRecorderThread()
+            audioRecorderThread?.start()
+            isListening = true
+            
+            Log.d(TAG, "Wake word detection started")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start wake word detection", e)
+            stopSelf()
+        }
+    }
+    
+    private fun stopListening() {
+        isListening = false
+        audioRecorderThread?.stopRecording()
+        audioRecorderThread = null
+        
+        modelRunner?.close()
+        modelRunner = null
+        wakeWordModel = null
+        
+        Log.d(TAG, "Wake word detection stopped")
+    }
+    
+    private fun onWakeWordDetected() {
+        Log.i(TAG, "Wake word detected! Launching Home Assistant Assist")
+        launchHomeAssistantAssist()
+    }
+    
+    private fun launchHomeAssistantAssist() {
+        try {
+            // Try to launch Home Assistant Assist directly
+            val assistIntent = Intent().apply {
+                action = "android.intent.action.ASSIST"
+                setPackage(HOME_ASSISTANT_PACKAGE)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            
+            if (assistIntent.resolveActivity(packageManager) != null) {
+                startActivity(assistIntent)
+                return
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to launch via ASSIST action", e)
+        }
+        
+        try {
+            // Try the Home Assistant deep link for Assist
+            val deepLinkIntent = Intent(Intent.ACTION_VIEW).apply {
+                data = Uri.parse("homeassistant://navigate/assist")
+                setPackage(HOME_ASSISTANT_PACKAGE)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            
+            if (deepLinkIntent.resolveActivity(packageManager) != null) {
+                startActivity(deepLinkIntent)
+                return
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to launch via deep link", e)
+        }
+        
+        try {
+            // Fallback: Launch the main Home Assistant app
+            val launchIntent = packageManager.getLaunchIntentForPackage(HOME_ASSISTANT_PACKAGE)
+            if (launchIntent != null) {
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(launchIntent)
+                return
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to launch Home Assistant app", e)
+        }
+        
+        Log.e(TAG, "Could not launch Home Assistant")
+    }
+    
+    private inner class AudioRecorderThread : Thread() {
+        private var audioRecord: AudioRecord? = null
+        @Volatile
+        private var recording = true
+        
+        @Suppress("MissingPermission")
+        override fun run() {
+            Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
+            
+            val minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
+            val bufferSize = maxOf(minBufferSize, BUFFER_SIZE_IN_SHORTS * 2)
+            
+            audioRecord = AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                SAMPLE_RATE,
+                CHANNEL_CONFIG,
+                AUDIO_FORMAT,
+                bufferSize
+            )
+            
+            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                Log.e(TAG, "AudioRecord failed to initialize")
+                return
+            }
+            
+            val audioBuffer = ShortArray(BUFFER_SIZE_IN_SHORTS)
+            audioRecord?.startRecording()
+            
+            Log.d(TAG, "Audio recording started")
+            
+            while (recording && isListening) {
+                val readResult = audioRecord?.read(audioBuffer, 0, audioBuffer.size) ?: 0
+                
+                if (readResult > 0) {
+                    // Convert short array to float array (normalized to -1.0 to 1.0)
+                    val floatBuffer = FloatArray(audioBuffer.size) { i ->
+                        audioBuffer[i] / 32768.0f
+                    }
+                    
+                    // Predict wake word
+                    val prediction = wakeWordModel?.predictWakeWord(floatBuffer) ?: 0f
+                    
+                    if (prediction > DETECTION_THRESHOLD) {
+                        Log.d(TAG, "Wake word prediction: $prediction (threshold: $DETECTION_THRESHOLD)")
+                        onWakeWordDetected()
+                    }
+                }
+            }
+            
+            releaseResources()
+        }
+        
+        fun stopRecording() {
+            recording = false
+        }
+        
+        private fun releaseResources() {
+            audioRecord?.stop()
+            audioRecord?.release()
+            audioRecord = null
+            Log.d(TAG, "Audio recording stopped")
+        }
+    }
+}
