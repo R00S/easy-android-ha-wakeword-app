@@ -225,8 +225,8 @@ class WakeWordModel(private val modelRunner: OnnxModelRunner) {
     fun predictWakeWord(audioBuffer: FloatArray): Float {
         streamingFeatures(audioBuffer)
         val features = getFeatures(16, -1)
-        if (features.isEmpty() || features[0].isEmpty()) {
-            Log.w(TAG, "Empty features buffer, skipping prediction")
+        if (features.isEmpty() || features[0].isEmpty() || features[0][0].isEmpty()) {
+            Log.w(TAG, "Empty or malformed features buffer, skipping prediction")
             return 0f
         }
         val score = modelRunner.predictWakeWord(features)
