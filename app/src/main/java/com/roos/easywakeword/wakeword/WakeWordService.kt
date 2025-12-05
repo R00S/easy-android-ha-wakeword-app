@@ -41,6 +41,10 @@ class WakeWordService : Service() {
         private const val DETECTION_THRESHOLD = 0.5f
         private const val HOME_ASSISTANT_PACKAGE = "io.homeassistant.companion.android"
         
+        // Track service running state
+        @Volatile
+        private var serviceRunning = false
+        
         fun start(context: Context) {
             val intent = Intent(context, WakeWordService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -55,14 +59,7 @@ class WakeWordService : Service() {
         }
         
         fun isRunning(context: Context): Boolean {
-            val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-            @Suppress("DEPRECATION")
-            for (service in manager.getRunningServices(Int.MAX_VALUE)) {
-                if (WakeWordService::class.java.name == service.service.className) {
-                    return true
-                }
-            }
-            return false
+            return serviceRunning
         }
     }
     
@@ -74,6 +71,7 @@ class WakeWordService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "Service created")
+        serviceRunning = true
         createNotificationChannel()
     }
     
@@ -87,6 +85,7 @@ class WakeWordService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "Service destroyed")
+        serviceRunning = false
         stopListening()
     }
     

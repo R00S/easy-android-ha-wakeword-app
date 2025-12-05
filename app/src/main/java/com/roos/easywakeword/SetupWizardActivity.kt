@@ -24,6 +24,9 @@ class SetupWizardActivity : AppCompatActivity() {
 
     companion object {
         const val HOME_ASSISTANT_PACKAGE = "io.homeassistant.companion.android"
+        
+        // Delay for UI update after service state change
+        private const val SERVICE_STATE_UPDATE_DELAY_MS = 500L
     }
 
     private val microphonePermissionLauncher = registerForActivityResult(
@@ -212,7 +215,7 @@ class SetupWizardActivity : AppCompatActivity() {
         // Small delay to let service state update
         binding.btnAction.postDelayed({
             updateStepUI()
-        }, 500)
+        }, SERVICE_STATE_UPDATE_DELAY_MS)
     }
 
     private fun openBatteryOptimizationSettings() {

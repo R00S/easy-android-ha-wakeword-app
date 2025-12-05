@@ -1,3 +1,26 @@
+/*
+ * Wake Word Detection Engine
+ * 
+ * This file is derived from OpenWakeWord for Android by Hasanat Ahmed Lodhi
+ * (https://github.com/hasanatlodhi/OpenwakewordforAndroid), which is itself
+ * based on OpenWakeWord by David Scripka (https://github.com/dscripka/openWakeWord).
+ * 
+ * Original work licensed under Apache License, Version 2.0.
+ * Modifications and Kotlin port by Easy Android HA Wakeword App Contributors.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.roos.easywakeword.wakeword
 
 import ai.onnxruntime.OnnxTensor
@@ -19,6 +42,11 @@ class OnnxModelRunner(private val assetManager: AssetManager) {
     companion object {
         private const val TAG = "OnnxModelRunner"
         private const val BATCH_SIZE = 1
+        
+        // Mel spectrogram transformation constants
+        // These normalize the spectrogram values to match the expected model input range
+        private const val MEL_SPEC_SCALE_DIVISOR = 10.0f
+        private const val MEL_SPEC_OFFSET = 2.0f
     }
     
     private val ortEnv: OrtEnvironment = OrtEnvironment.getEnvironment()
@@ -137,7 +165,7 @@ class OnnxModelRunner(private val assetManager: AssetManager) {
     private fun applyMelSpecTransform(array: Array<FloatArray>): Array<FloatArray> {
         return Array(array.size) { i ->
             FloatArray(array[i].size) { j ->
-                array[i][j] / 10.0f + 2.0f
+                array[i][j] / MEL_SPEC_SCALE_DIVISOR + MEL_SPEC_OFFSET
             }
         }
     }
@@ -154,6 +182,10 @@ class WakeWordModel(private val modelRunner: OnnxModelRunner) {
         private const val N_PREPARED_SAMPLES = 1280
         private const val MELSPECTROGRAM_MAX_LEN = 10 * 97
         private const val FEATURE_BUFFER_MAX_LEN = 120
+        
+        // Random initialization data range (simulates audio sample range)
+        private const val INIT_RANDOM_RANGE = 2000f
+        private const val INIT_RANDOM_OFFSET = 1000f
     }
     
     private var featureBuffer: Array<FloatArray>? = null
@@ -163,9 +195,11 @@ class WakeWordModel(private val modelRunner: OnnxModelRunner) {
     private var accumulatedSamples = 0
     
     init {
-        // Initialize feature buffer with random data
+        // Initialize feature buffer with random data to prime the model buffers
         try {
-            val randomData = FloatArray(SAMPLE_RATE * 4) { Random.nextFloat() * 2000 - 1000 }
+            val randomData = FloatArray(SAMPLE_RATE * 4) { 
+                Random.nextFloat() * INIT_RANDOM_RANGE - INIT_RANDOM_OFFSET 
+            }
             featureBuffer = getEmbeddings(randomData, 76, 8)
             Log.d(TAG, "Model initialized")
         } catch (e: Exception) {
