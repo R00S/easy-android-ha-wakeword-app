@@ -378,13 +378,15 @@ automation:
 
 ### Wake Word Models
 
-The app includes a placeholder for the "Hey Mycroft" model. For production use, obtain actual models from:
+The app bundles the **"Hey Mycroft"** wake word model from [OpenWakeWord](https://github.com/dscripka/openWakeWord) — ready to use out of the box with no additional downloads required.
 
-- [OpenWakeWord](https://github.com/dscripka/openWakeWord) — Modern, accurate models
-- [Mycroft Precise](https://github.com/MycroftAI/mycroft-precise) — Original Mycroft models
+**Model details:**
+- Wake word: "Hey Mycroft"
+- Size: ~840 KB
+- License: Creative Commons Attribution-NonCommercial-ShareAlike 4.0
+- Source: [OpenWakeWord v0.5.1](https://github.com/dscripka/openWakeWord/releases/tag/v0.5.1)
 
-**Supported wake words (OpenWakeWord):**
-- `hey_mycroft`
+**Other available wake words (via OpenWakeWord):**
 - `ok_nabu` (Home Assistant native)
 - `alexa`
 - `hey_jarvis`
