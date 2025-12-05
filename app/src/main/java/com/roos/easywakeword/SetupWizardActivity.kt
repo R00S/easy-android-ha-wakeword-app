@@ -24,7 +24,7 @@ class SetupWizardActivity : AppCompatActivity() {
 
     // Package names
     companion object {
-        const val HOTWORD_PLUGIN_PACKAGE = "com.pocketsphinx.hotword"
+        const val HOTWORD_PLUGIN_PACKAGE = "nl.jolanrensen.hotwordPlugin"
         const val AUTOMATE_PACKAGE = "com.llamalab.automate"
         const val HOME_ASSISTANT_PACKAGE = "io.homeassistant.companion.android"
         
