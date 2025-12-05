@@ -45,4 +45,5 @@
     <!-- Error messages -->
     <string name="error_install_failed">Could not open Play Store. Please install the app manually.</string>
     <string name="error_import_failed">Could not import file. Please ensure the target app is installed.</string>
+    <string name="battery_optimization_manual">Please disable battery optimization manually in Settings</string>
 </resources>

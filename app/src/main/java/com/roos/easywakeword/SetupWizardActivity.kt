@@ -287,6 +287,10 @@ class SetupWizardActivity : AppCompatActivity() {
     }
 
     private fun copyAssetToCache(assetName: String): File {
+        // Validate asset name to prevent path traversal
+        require(!assetName.contains("..") && !assetName.contains("/") && !assetName.contains("\\")) {
+            "Invalid asset name"
+        }
         val file = File(cacheDir, assetName)
         if (!file.exists()) {
             assets.open(assetName).use { input ->
@@ -310,7 +314,7 @@ class SetupWizardActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Toast.makeText(
                     this,
-                    "Please disable battery optimization manually in Settings",
+                    getString(R.string.battery_optimization_manual),
                     Toast.LENGTH_LONG
                 ).show()
             }
