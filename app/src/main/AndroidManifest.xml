@@ -6,6 +6,11 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Request battery optimization exemption -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Microphone permission for wake word detection -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Foreground service permission -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <application
         android:allowBackup="true"
@@ -25,6 +30,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Wake Word Detection Service -->
+        <service
+            android:name=".wakeword.WakeWordService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <!-- FileProvider for sharing assets to other apps -->
         <provider

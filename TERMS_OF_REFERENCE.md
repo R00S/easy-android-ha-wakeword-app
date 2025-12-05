@@ -1,39 +1,52 @@
 # Terms of Reference (ToR)
 ## Project
-Android helper app for always-on wake word to trigger Home Assistant Assist, using Automate + Hotword Plugin.
+Self-contained Android app for always-on wake word detection to trigger Home Assistant Assist, using built-in OpenWakeWord neural network processing.
 
 ## Goal
-Deliver a minimal-tap setup on old Android phones/tablets: install Hotword Plugin and Automate, import a bundled Automate flow, load a default wake-word model (“Hey Mycroft”), and ensure the wake word opens Home Assistant Assist (or the HA app) with no typing required.
+Deliver a minimal-tap setup on old Android phones/tablets: grant microphone permission, disable battery optimization, and start the wake word detection service. The app listens for "Hey Mycroft" and opens Home Assistant Assist with no external app dependencies and no typing required.
 
 ## Scope
-- Build a small Kotlin Android helper app (single-activity wizard).
-- Ship one Automate `.flo` (always-on only; no screen/headset/charging gating).
-- Bundle a permissively licensed wake-word model (“Hey Mycroft”, <8 MB) and import it into Hotword Plugin via its public import/share intent.
-- Keep everything on-device; no user typing required.
+- Build a self-contained Kotlin Android app (single-activity wizard + foreground service).
+- Integrate OpenWakeWord via ONNX Runtime for on-device wake word detection.
+- Bundle ONNX models for mel-spectrogram, audio embeddings, and wake word classification.
+- Keep everything on-device; no cloud services, no external apps, no user typing required.
 
 ## Wizard Steps (UX)
-1) Install Hotword Plugin (Play Store deep link), then Continue.
-2) Install Automate (Play Store deep link), then Continue.
-3) Import bundled `.flo` into Automate via its import intent (one tap).
-4) Enable the flow (open Automate with the flow preselected; user toggles on).
-5) Load the wake-word model into Hotword Plugin via share/import (one tap).
+1) Grant microphone permission (required for wake word detection).
+2) Disable battery optimization (ensures service stays running).
+3) Start wake word detection service (one tap to begin listening).
 
-## Automate Flow Behavior
-- Trigger: Hotword Plugin broadcast/intent on wake-word detection.
-- Action: Launch HA Assist via intent/deeplink if available; fallback to open HA app Assist screen or main activity.
-- Optional webhook/audio block included but disabled by default.
-- Foreground/persistent notification to stay alive; no gating (no screen/headset/charging checks).
+## Wake Word Detection
+- **Audio Capture**: 16kHz mono, 1280-sample chunks (80ms).
+- **Processing Pipeline**: Audio → Mel-spectrogram → Embeddings → Wake word classifier.
+- **Models**: ONNX format, bundled in assets (~2.5MB total).
+- **Threshold**: Detection score > 0.5 triggers action.
+- **Action**: Launch HA Assist via intent; fallback to deep link or main HA app.
+
+## Foreground Service
+- Persistent notification shows "Listening for wake word".
+- Continuous audio capture and real-time processing.
+- Survives app being swiped from recents.
+- Works with screen off and on battery.
 
 ## Permissions and Reliability
-- Mic permission is requested by Hotword Plugin.
-- Helper app requests POST_NOTIFICATIONS (Android 13+) and opens battery-optimization exemption settings.
-- Optional Quick Settings tile to toggle the Automate flow via intent.
+- RECORD_AUDIO: Required for wake word detection.
+- FOREGROUND_SERVICE + FOREGROUND_SERVICE_MICROPHONE: Required for background listening.
+- POST_NOTIFICATIONS: Required on Android 13+ for service notification.
+- REQUEST_IGNORE_BATTERY_OPTIMIZATIONS: Prompts user to exempt app from battery optimization.
 
 ## Deliverables
-- Android helper app source + build instructions.
-- Bundled Automate `.flo` file and import wiring.
-- Bundled wake-word model and import/share flow.
-- README with tap-by-tap sequence and HA intent/deeplink constants.
+- Self-contained Android app source + build instructions.
+- Bundled ONNX models (melspectrogram.onnx, embedding_model.onnx, hey_mycroft.onnx).
+- README with setup steps and architecture documentation.
+- THIRD_PARTY_NOTICES.md with license attributions for OpenWakeWord.
+- AGENT_HANDOFF.md with testing/debugging guidance.
+
+## Dependencies
+- `com.microsoft.onnxruntime:onnxruntime-android:1.16.0` - Neural network inference.
+- `org.apache.commons:commons-math3:3.6.1` - Audio processing utilities.
 
 ## Acceptance Criteria
-- On a clean device, with no typing: install helper → follow prompts → end with always-listening wake word that opens HA Assist (or HA app) on detection.
+- On a clean device, with no typing: install app → grant mic permission → disable battery optimization → start service → say "Hey Mycroft" → Home Assistant Assist opens.
+- No external apps required (Hotword Plugin, Automate, Tasker not needed).
+- All processing happens on-device with no internet required for detection.

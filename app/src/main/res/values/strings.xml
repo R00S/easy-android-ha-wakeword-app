@@ -2,30 +2,24 @@
     <string name="app_name">Easy HA Wakeword</string>
     <string name="wizard_title">Wake Word Setup Wizard</string>
     
-    <!-- Step 1: Install Hotword Plugin -->
-    <string name="step1_title">Step 1: Install Hotword Plugin</string>
-    <string name="step1_description">Hotword Plugin provides always-on wake word detection using minimal battery.</string>
-    <string name="step1_button_install">Install Hotword Plugin</string>
+    <!-- Step 1: Microphone Permission -->
+    <string name="step1_title">Step 1: Microphone Permission</string>
+    <string name="step1_description">Allow microphone access for wake word detection. The app listens locally on your device - no audio is sent to any server.</string>
+    <string name="step1_button_grant">Grant Microphone Permission</string>
+    <string name="step1_permission_granted">Microphone permission granted ✓</string>
     
-    <!-- Step 2: Install Automate -->
-    <string name="step2_title">Step 2: Install Automate</string>
-    <string name="step2_description">Automate will handle the action when your wake word is detected, launching Home Assistant Assist.</string>
-    <string name="step2_button_install">Install Automate</string>
+    <!-- Step 2: Battery Optimization -->
+    <string name="step2_title">Step 2: Battery Optimization</string>
+    <string name="step2_description">Disable battery optimization to ensure reliable always-on wake word detection.</string>
+    <string name="step2_button_disable">Disable Battery Optimization</string>
     
-    <!-- Step 3: Import Flow -->
-    <string name="step3_title">Step 3: Import Automate Flow</string>
-    <string name="step3_description">This will import the pre-configured flow that listens for wake words and opens Home Assistant Assist.</string>
-    <string name="step3_button_import">Import Flow</string>
-    
-    <!-- Step 4: Enable Flow -->
-    <string name="step4_title">Step 4: Enable the Flow</string>
-    <string name="step4_description">Open Automate and toggle on the \"HA Wake Word\" flow to activate it.</string>
-    <string name="step4_button_open">Open Automate</string>
-    
-    <!-- Step 5: Load Wake Word Model -->
-    <string name="step5_title">Step 5: Load Wake Word Model</string>
-    <string name="step5_description">Import the \"Hey Mycroft\" wake word model into Hotword Plugin. After import, enable it in Hotword Plugin settings.</string>
-    <string name="step5_button_import">Import Wake Word Model</string>
+    <!-- Step 3: Start Wake Word Detection -->
+    <string name="step3_title">Step 3: Start Wake Word Detection</string>
+    <string name="step3_description">Start the wake word detection service. It will listen for \"Hey Mycroft\" and launch Home Assistant Assist when detected.</string>
+    <string name="step3_button_start">Start Wake Word Detection</string>
+    <string name="step3_button_stop">Stop Wake Word Detection</string>
+    <string name="step3_status_running">Wake word detection is running ✓</string>
+    <string name="step3_status_stopped">Wake word detection is stopped</string>
     
     <!-- Common -->
     <string name="button_continue">Continue</string>
@@ -35,15 +29,21 @@
     
     <!-- Completion -->
     <string name="setup_complete_title">Setup Complete!</string>
-    <string name="setup_complete_description">Your device is now ready. Say \"Hey Mycroft\" to open Home Assistant Assist.\n\nMake sure:\n• Hotword Plugin is running\n• Automate flow is enabled\n• Battery optimization is disabled for both apps</string>
+    <string name="setup_complete_description">Your device is now ready. Say \"Hey Mycroft\" to open Home Assistant Assist.\n\nMake sure:\n• Wake word detection is running (check notification)\n• Home Assistant app is installed\n• Battery optimization is disabled</string>
+    
+    <!-- Notification -->
+    <string name="notification_channel_name">Wake Word Detection</string>
+    <string name="notification_channel_description">Shows when wake word detection is active</string>
+    <string name="notification_title">Listening for wake word</string>
+    <string name="notification_text">Say \"Hey Mycroft\" to open Home Assistant Assist</string>
     
     <!-- Permissions -->
     <string name="permission_battery_title">Battery Optimization</string>
-    <string name="permission_battery_description">For reliable wake word detection, disable battery optimization for Hotword Plugin and Automate.</string>
+    <string name="permission_battery_description">For reliable wake word detection, disable battery optimization.</string>
     <string name="button_battery_settings">Open Battery Settings</string>
     
     <!-- Error messages -->
-    <string name="error_install_failed">Could not open Play Store. Please install the app manually.</string>
-    <string name="error_import_failed">Could not import file. Please ensure the target app is installed.</string>
+    <string name="error_permission_denied">Microphone permission is required for wake word detection</string>
+    <string name="error_service_failed">Could not start wake word detection service</string>
     <string name="battery_optimization_manual">Please disable battery optimization manually in Settings</string>
 </resources>
