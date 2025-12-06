@@ -22,6 +22,11 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+        debug {
+            // Use different package name for debug builds so they can coexist with release
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug-android10-fix"
+        }
     }
 
     compileOptions {
