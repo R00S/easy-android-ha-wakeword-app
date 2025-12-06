@@ -1,5 +1,9 @@
 # Easy Android HA Wakeword App
 
+> ⚠️ **TESTING PRE-RELEASE** ⚠️
+> 
+> This app is currently in testing/pre-release state. Features may be incomplete or unstable. Please report any issues you encounter.
+
 [![Android](https://img.shields.io/badge/Android-7.0%2B-green.svg)](https://developer.android.com)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Compatible-41BDF5.svg)](https://www.home-assistant.io/)
@@ -294,7 +298,7 @@ The app bundles the **"Hey Mycroft"** wake word model from [OpenWakeWord](https:
 
 **Model details:**
 - Wake word: "Hey Mycroft"
-- Detection threshold: 0.5
+- Detection threshold: 0.05
 - Processing: Real-time (80ms chunks)
 - Framework: ONNX Runtime
 

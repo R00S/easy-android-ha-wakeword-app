@@ -19,8 +19,11 @@ import android.os.Process
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.roos.easywakeword.R
 import com.roos.easywakeword.SetupWizardActivity
+import kotlin.math.log10
+import kotlin.math.sqrt
 
 /**
  * Foreground service that continuously listens for the wake word
@@ -40,6 +43,11 @@ class WakeWordService : Service() {
         
         private const val DETECTION_THRESHOLD = 0.05f
         private const val HOME_ASSISTANT_PACKAGE = "io.homeassistant.companion.android"
+        
+        // Broadcast action for audio level updates
+        const val ACTION_AUDIO_LEVEL = "com.roos.easywakeword.AUDIO_LEVEL"
+        const val EXTRA_AUDIO_LEVEL = "audio_level"
+        const val EXTRA_PREDICTION_SCORE = "prediction_score"
         
         // Track service running state
         @Volatile
@@ -215,10 +223,20 @@ class WakeWordService : Service() {
         Log.e(TAG, "Could not launch Home Assistant")
     }
     
+    private fun broadcastAudioLevel(audioLevel: Float, predictionScore: Float) {
+        val intent = Intent(ACTION_AUDIO_LEVEL).apply {
+            putExtra(EXTRA_AUDIO_LEVEL, audioLevel)
+            putExtra(EXTRA_PREDICTION_SCORE, predictionScore)
+        }
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+    }
+    
     private inner class AudioRecorderThread : Thread() {
         private var audioRecord: AudioRecord? = null
         @Volatile
         private var recording = true
+        private var lastBroadcastTime = 0L
+        private val broadcastIntervalMs = 100L // Limit broadcasts to 10 per second
         
         @Suppress("MissingPermission")
         override fun run() {
@@ -227,8 +245,10 @@ class WakeWordService : Service() {
             val minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
             val bufferSize = maxOf(minBufferSize, BUFFER_SIZE_IN_SHORTS * 2)
             
+            // Use VOICE_RECOGNITION audio source for better far-field audio capture
+            // This typically uses the best available microphone for voice input
             audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
+                MediaRecorder.AudioSource.VOICE_RECOGNITION,
                 SAMPLE_RATE,
                 CHANNEL_CONFIG,
                 AUDIO_FORMAT,
@@ -243,7 +263,7 @@ class WakeWordService : Service() {
             val audioBuffer = ShortArray(BUFFER_SIZE_IN_SHORTS)
             audioRecord?.startRecording()
             
-            Log.d(TAG, "Audio recording started")
+            Log.d(TAG, "Audio recording started with VOICE_RECOGNITION source")
             
             while (recording && isListening) {
                 val readResult = audioRecord?.read(audioBuffer, 0, audioBuffer.size) ?: 0
@@ -254,8 +274,18 @@ class WakeWordService : Service() {
                         audioBuffer[i] / 32768.0f
                     }
                     
+                    // Calculate audio level (RMS in dB)
+                    val audioLevel = calculateAudioLevel(audioBuffer)
+                    
                     // Predict wake word
                     val prediction = wakeWordModel?.predictWakeWord(floatBuffer) ?: 0f
+                    
+                    // Broadcast audio level for UI feedback (throttled)
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastBroadcastTime >= broadcastIntervalMs) {
+                        broadcastAudioLevel(audioLevel, prediction)
+                        lastBroadcastTime = currentTime
+                    }
                     
                     // Log all predictions above 0.01 for debugging
                     if (prediction > 0.01f) {
@@ -270,6 +300,23 @@ class WakeWordService : Service() {
             }
             
             releaseResources()
+        }
+        
+        private fun calculateAudioLevel(buffer: ShortArray): Float {
+            // Calculate RMS (Root Mean Square) for audio level using Long to avoid overflow
+            var sum = 0L
+            for (sample in buffer) {
+                sum += sample.toLong() * sample.toLong()
+            }
+            val rms = sqrt(sum.toDouble() / buffer.size)
+            
+            // Convert to dB scale (0-100 range for UI)
+            // Max short value is 32768, so max RMS would be around that
+            val db = if (rms > 0) 20 * log10(rms / 32768.0) else -100.0
+            
+            // Normalize to 0-100 scale (-60dB to 0dB range)
+            val normalized = ((db + 60) / 60 * 100).coerceIn(0.0, 100.0)
+            return normalized.toFloat()
         }
         
         fun stopRecording() {

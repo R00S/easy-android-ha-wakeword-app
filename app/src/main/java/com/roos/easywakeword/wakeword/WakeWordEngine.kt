@@ -193,6 +193,9 @@ class WakeWordModel(private val modelRunner: OnnxModelRunner) {
         private const val N_PREPARED_SAMPLES = 1280
         private const val MELSPECTROGRAM_MAX_LEN = 10 * 97
         private const val FEATURE_BUFFER_MAX_LEN = 120
+        private const val WINDOW_SIZE = 76           // Number of mel-spectrogram frames per window
+        private const val MEL_BINS = 32              // Number of mel frequency bins
+        private const val STEP_SIZE = 8              // Frame step size for sliding window
         
         // Random initialization data range (simulates audio sample range)
         private const val INIT_RANDOM_RANGE = 2000f
@@ -202,7 +205,7 @@ class WakeWordModel(private val modelRunner: OnnxModelRunner) {
     private var featureBuffer: Array<FloatArray>? = null
     private val rawDataBuffer = ArrayDeque<Float>(SAMPLE_RATE * 10)
     private var rawDataRemainder = FloatArray(0)
-    private var melspectrogramBuffer = Array(76) { FloatArray(32) { 1.0f } }
+    private var melspectrogramBuffer = Array(WINDOW_SIZE) { FloatArray(MEL_BINS) { 1.0f } }
     private var accumulatedSamples = 0
     
     init {
@@ -211,7 +214,7 @@ class WakeWordModel(private val modelRunner: OnnxModelRunner) {
             val randomData = FloatArray(SAMPLE_RATE * 4) { 
                 Random.nextFloat() * INIT_RANDOM_RANGE - INIT_RANDOM_OFFSET 
             }
-            featureBuffer = getEmbeddings(randomData, 76, 8)
+            featureBuffer = getEmbeddings(randomData, WINDOW_SIZE, STEP_SIZE)
             if (featureBuffer != null) {
                 Log.d(TAG, "Model initialized successfully, feature buffer size: ${featureBuffer!!.size}")
             } else {
@@ -364,22 +367,28 @@ class WakeWordModel(private val modelRunner: OnnxModelRunner) {
         if (accumulatedSamples >= N_PREPARED_SAMPLES && accumulatedSamples % N_PREPARED_SAMPLES == 0) {
             streamingMelSpectrogram(accumulatedSamples)
             
-            val x = Array(1) { Array(76) { Array(32) { floatArrayOf(0f) } } }
+            val x = Array(1) { Array(WINDOW_SIZE) { Array(MEL_BINS) { floatArrayOf(0f) } } }
             
             for (i in (accumulatedSamples / N_PREPARED_SAMPLES - 1) downTo 0) {
-                var ndx = -8 * i
-                if (ndx == 0) ndx = melspectrogramBuffer.size
+                // Correct index calculation: for i=0, use full buffer size; for i>0, offset backwards
+                val ndx = if (i == 0) melspectrogramBuffer.size else melspectrogramBuffer.size - STEP_SIZE * i
                 
-                val start = maxOf(0, ndx - 76)
-                val end = ndx
+                // Ensure we don't go out of bounds
+                if (ndx <= 0 || ndx > melspectrogramBuffer.size) continue
+                
+                val start = maxOf(0, ndx - WINDOW_SIZE)
+                val end = minOf(ndx, melspectrogramBuffer.size)
+                
+                // Only process if we have enough frames
+                if (end - start < WINDOW_SIZE) continue
                 
                 for ((k, j) in (start until end).withIndex()) {
-                    for (w in 0 until 32) {
+                    for (w in 0 until MEL_BINS) {
                         x[0][k][w][0] = melspectrogramBuffer[j][w]
                     }
                 }
                 
-                if (x[0].size == 76) {
+                if (x[0].size == WINDOW_SIZE) {
                     val newFeatures = modelRunner.generateEmbeddings(x)
                     if (newFeatures != null) {
                         featureBuffer = if (featureBuffer == null) {
