@@ -44,7 +44,11 @@ class WakeWordService : Service() {
         private const val DETECTION_THRESHOLD = 0.05f
         private const val HOME_ASSISTANT_PACKAGE = "io.homeassistant.companion.android"
         
-        // Cooldown period to prevent rapid-fire launches (3 seconds)
+        // Cooldown period to prevent rapid-fire launches
+        // 3 seconds is chosen because:
+        // - Wake word score can remain elevated for multiple consecutive frames
+        // - Android may throttle or reject rapid intent launches
+        // - Users typically need a moment to formulate their voice command after saying the wake word
         private const val LAUNCH_COOLDOWN_MS = 3000L
         
         // Broadcast action for audio level updates
