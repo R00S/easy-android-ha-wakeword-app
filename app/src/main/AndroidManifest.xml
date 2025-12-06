@@ -33,12 +33,11 @@
         </activity>
 
         <!-- Wake Word Detection Service -->
-        <!-- foregroundServiceType is only available on Android 10+ (API 29+), but microphone type requires API 30+ -->
+        <!-- Note: foregroundServiceType is NOT declared here to support Android 10 (API 29).
+             The service type is set programmatically in startForeground() for Android 11+ (API 30+) -->
         <service
             android:name=".wakeword.WakeWordService"
-            android:exported="false"
-            android:foregroundServiceType="microphone"
-            tools:targetApi="r" />
+            android:exported="false" />
 
         <!-- FileProvider for sharing assets to other apps -->
         <provider
