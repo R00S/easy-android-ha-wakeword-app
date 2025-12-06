@@ -21,6 +21,11 @@
     <string name="step3_status_running">Wake word detection is running ✓</string>
     <string name="step3_status_stopped">Wake word detection is stopped</string>
     
+    <!-- Audio Level Feedback -->
+    <string name="audio_level_label">Audio Level</string>
+    <string name="prediction_score_default">Wake word score: 0.00</string>
+    <string name="prediction_score_format">Wake word score: %.2f</string>
+    
     <!-- Common -->
     <string name="button_continue">Continue</string>
     <string name="button_back">Back</string>

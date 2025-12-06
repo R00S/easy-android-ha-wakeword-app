@@ -120,6 +120,47 @@
                 android:textSize="16sp"
                 tools:text="Hotword Plugin provides always-on wake word detection." />
 
+            <!-- Audio Level Indicator (visible only on step 3 when service is running) -->
+            <LinearLayout
+                android:id="@+id/audioLevelContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+                
+                <TextView
+                    android:id="@+id/tvAudioLevelLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="@string/audio_level_label"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+                
+                <ProgressBar
+                    android:id="@+id/audioLevelBar"
+                    style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="8dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginHorizontal="32dp"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressTint="@color/primary" />
+                
+                <TextView
+                    android:id="@+id/tvPredictionScore"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/prediction_score_default"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+                
+            </LinearLayout>
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnAction"
                 android:layout_width="wrap_content"

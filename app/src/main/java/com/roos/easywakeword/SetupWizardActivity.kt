@@ -1,7 +1,10 @@
 package com.roos.easywakeword
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -13,6 +16,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.roos.easywakeword.databinding.ActivitySetupWizardBinding
 import com.roos.easywakeword.wakeword.WakeWordService
 
@@ -27,6 +31,17 @@ class SetupWizardActivity : AppCompatActivity() {
         
         // Delay for UI update after service state change
         private const val SERVICE_STATE_UPDATE_DELAY_MS = 500L
+    }
+
+    // Broadcast receiver for audio level updates from the service
+    private val audioLevelReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == WakeWordService.ACTION_AUDIO_LEVEL) {
+                val audioLevel = intent.getFloatExtra(WakeWordService.EXTRA_AUDIO_LEVEL, 0f)
+                val predictionScore = intent.getFloatExtra(WakeWordService.EXTRA_PREDICTION_SCORE, 0f)
+                updateAudioLevelUI(audioLevel, predictionScore)
+            }
+        }
     }
 
     private val microphonePermissionLauncher = registerForActivityResult(
@@ -57,11 +72,34 @@ class SetupWizardActivity : AppCompatActivity() {
         super.onResume()
         // Update UI in case permissions or service state changed
         updateStepUI()
+        // Register for audio level updates
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+            audioLevelReceiver,
+            IntentFilter(WakeWordService.ACTION_AUDIO_LEVEL)
+        )
+    }
+    
+    override fun onPause() {
+        super.onPause()
+        // Unregister the broadcast receiver (safe to call even if not registered)
+        try {
+            LocalBroadcastManager.getInstance(this).unregisterReceiver(audioLevelReceiver)
+        } catch (e: IllegalArgumentException) {
+            // Receiver was not registered, ignore
+        }
     }
 
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+    
+    private fun updateAudioLevelUI(audioLevel: Float, predictionScore: Float) {
+        // Ensure UI updates are on main thread
+        runOnUiThread {
+            binding.audioLevelBar.progress = audioLevel.toInt()
+            binding.tvPredictionScore.text = getString(R.string.prediction_score_format, predictionScore)
         }
     }
 
@@ -115,6 +153,7 @@ class SetupWizardActivity : AppCompatActivity() {
         binding.btnContinue.text = getString(R.string.button_continue)
         binding.ivIcon.setImageResource(R.drawable.ic_step_default)
         binding.stepIndicator.visibility = View.VISIBLE
+        binding.audioLevelContainer.visibility = View.GONE
         
         if (hasMicrophonePermission()) {
             binding.tvStepDescription.text = getString(R.string.step1_permission_granted)
@@ -133,6 +172,7 @@ class SetupWizardActivity : AppCompatActivity() {
         binding.btnAction.visibility = View.VISIBLE
         binding.btnContinue.text = getString(R.string.button_continue)
         binding.ivIcon.setImageResource(R.drawable.ic_step_default)
+        binding.audioLevelContainer.visibility = View.GONE
     }
 
     private fun setupStep3() {
@@ -143,9 +183,13 @@ class SetupWizardActivity : AppCompatActivity() {
         if (isServiceRunning()) {
             binding.tvStepDescription.text = getString(R.string.step3_status_running)
             binding.btnAction.text = getString(R.string.step3_button_stop)
+            // Show audio level indicator when service is running
+            binding.audioLevelContainer.visibility = View.VISIBLE
         } else {
             binding.tvStepDescription.text = getString(R.string.step3_description)
             binding.btnAction.text = getString(R.string.step3_button_start)
+            // Hide audio level indicator when service is stopped
+            binding.audioLevelContainer.visibility = View.GONE
         }
         binding.btnAction.visibility = View.VISIBLE
     }
@@ -158,6 +202,7 @@ class SetupWizardActivity : AppCompatActivity() {
         binding.btnContinue.text = getString(R.string.button_done)
         binding.btnBack.visibility = View.INVISIBLE
         binding.ivIcon.setImageResource(R.drawable.ic_check)
+        binding.audioLevelContainer.visibility = View.GONE
         
         // Hide step indicators for completion screen
         binding.stepIndicator.visibility = View.GONE
