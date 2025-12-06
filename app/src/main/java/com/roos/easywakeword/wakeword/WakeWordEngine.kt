@@ -367,11 +367,17 @@ class WakeWordModel(private val modelRunner: OnnxModelRunner) {
             val x = Array(1) { Array(76) { Array(32) { floatArrayOf(0f) } } }
             
             for (i in (accumulatedSamples / N_PREPARED_SAMPLES - 1) downTo 0) {
-                var ndx = -8 * i
-                if (ndx == 0) ndx = melspectrogramBuffer.size
+                // Correct index calculation: for i=0, use full buffer size; for i>0, offset backwards
+                val ndx = if (i == 0) melspectrogramBuffer.size else melspectrogramBuffer.size - 8 * i
+                
+                // Ensure we don't go out of bounds
+                if (ndx <= 0 || ndx > melspectrogramBuffer.size) continue
                 
                 val start = maxOf(0, ndx - 76)
-                val end = ndx
+                val end = minOf(ndx, melspectrogramBuffer.size)
+                
+                // Only process if we have enough frames
+                if (end - start < 76) continue
                 
                 for ((k, j) in (start until end).withIndex()) {
                     for (w in 0 until 32) {
