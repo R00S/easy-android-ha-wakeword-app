@@ -128,11 +128,11 @@ implementation 'org.apache.commons:commons-math3:3.6.1'
 
 ## Known Limitations
 
-1. **Wake Word Model** - Currently using "hey_nugget" model renamed to "hey_mycroft". A proper "Hey Mycroft" trained model would be more accurate.
+1. **Wake Word Model** - Currently using "hey_nugget" model renamed to "hey_mycroft". **Say "Hey Nugget"** to trigger detection (not "Hey Mycroft"). A proper "Hey Mycroft" trained model would be more accurate.
 
 2. **No Model Customization** - Users cannot choose different wake words without bundling new models.
 
-3. **Detection Threshold** - Fixed at 0.5; may need tuning based on real-world testing.
+3. **Detection Threshold** - Set to 0.05 based on reference implementations (Re-MENTIA/openwakeword-android-kt). This may need further tuning based on environment.
 
 4. **No Audio Feedback** - No sound/vibration when wake word detected.
 

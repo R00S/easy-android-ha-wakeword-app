@@ -56,9 +56,9 @@ class OnnxModelRunner(private val assetManager: AssetManager) {
         try {
             val modelBytes = readModelFile("hey_mycroft.onnx")
             wakeWordSession = ortEnv.createSession(modelBytes)
-            Log.d(TAG, "Wake word model loaded successfully")
+            Log.d(TAG, "Wake word model loaded successfully (${modelBytes.size} bytes)")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load wake word model", e)
+            Log.e(TAG, "Failed to load wake word model: ${e.message}", e)
         }
     }
     
@@ -79,10 +79,12 @@ class OnnxModelRunner(private val assetManager: AssetManager) {
                 @Suppress("UNCHECKED_CAST")
                 val outputTensor = results[0].value as Array<Array<Array<FloatArray>>>
                 val squeezed = squeeze(outputTensor)
-                return applyMelSpecTransform(squeezed)
+                val transformed = applyMelSpecTransform(squeezed)
+                Log.d(TAG, "Computed mel spectrogram: ${transformed.size} frames of ${transformed[0].size} mel bins")
+                return transformed
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error computing mel spectrogram", e)
+            Log.e(TAG, "Error computing mel spectrogram: ${e.message}", e)
             return null
         } finally {
             inputTensor?.close()
@@ -109,10 +111,11 @@ class OnnxModelRunner(private val assetManager: AssetManager) {
                 for (i in rawOutput.indices) {
                     System.arraycopy(rawOutput[i][0][0], 0, reshapedOutput[i], 0, rawOutput[i][0][0].size)
                 }
+                Log.d(TAG, "Generated embeddings: ${reshapedOutput.size} frames of ${reshapedOutput[0].size} features")
                 return reshapedOutput
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error generating embeddings", e)
+            Log.e(TAG, "Error generating embeddings: ${e.message}", e)
             return null
         } finally {
             inputTensor?.close()
@@ -121,7 +124,11 @@ class OnnxModelRunner(private val assetManager: AssetManager) {
     }
     
     fun predictWakeWord(inputArray: Array<Array<FloatArray>>): Float {
-        val session = wakeWordSession ?: return 0f
+        val session = wakeWordSession
+        if (session == null) {
+            Log.w(TAG, "Wake word session is null, returning 0")
+            return 0f
+        }
         var inputTensor: OnnxTensor? = null
         
         try {
@@ -131,10 +138,14 @@ class OnnxModelRunner(private val assetManager: AssetManager) {
             session.run(mapOf(inputName to inputTensor)).use { results ->
                 @Suppress("UNCHECKED_CAST")
                 val result = results[0].value as Array<FloatArray>
-                return result[0][0]
+                val score = result[0][0]
+                if (score > 0.01f) {
+                    Log.d(TAG, "Wake word model raw score: $score")
+                }
+                return score
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error predicting wake word", e)
+            Log.e(TAG, "Error predicting wake word: ${e.message}", e)
             return 0f
         } finally {
             inputTensor?.close()
@@ -201,16 +212,28 @@ class WakeWordModel(private val modelRunner: OnnxModelRunner) {
                 Random.nextFloat() * INIT_RANDOM_RANGE - INIT_RANDOM_OFFSET 
             }
             featureBuffer = getEmbeddings(randomData, 76, 8)
-            Log.d(TAG, "Model initialized")
+            if (featureBuffer != null) {
+                Log.d(TAG, "Model initialized successfully, feature buffer size: ${featureBuffer!!.size}")
+            } else {
+                Log.e(TAG, "Model initialization returned null feature buffer")
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error initializing model", e)
+            Log.e(TAG, "Error initializing model: ${e.message}", e)
         }
     }
     
     fun predictWakeWord(audioBuffer: FloatArray): Float {
         streamingFeatures(audioBuffer)
         val features = getFeatures(16, -1)
-        return modelRunner.predictWakeWord(features)
+        if (features.isEmpty() || features[0].isEmpty() || features[0][0].isEmpty()) {
+            Log.w(TAG, "Empty or malformed features buffer, skipping prediction")
+            return 0f
+        }
+        val score = modelRunner.predictWakeWord(features)
+        if (score > 0.01f) {
+            Log.d(TAG, "Wake word score: $score, features shape: [${features.size}][${features[0].size}][${features[0][0].size}]")
+        }
+        return score
     }
     
     private fun getFeatures(nFeatureFrames: Int, startNdxParam: Int): Array<Array<FloatArray>> {
