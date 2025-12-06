@@ -106,16 +106,17 @@ class WakeWordService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "Service started")
         try {
+            val notification = createNotification()
             // Android 10 (API 29) and below: Use startForeground without service type
             // Android 11 (API 30) and above: Use startForeground with FOREGROUND_SERVICE_TYPE_MICROPHONE
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 startForeground(
                     NOTIFICATION_ID, 
-                    createNotification(),
+                    notification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
                 )
             } else {
-                startForeground(NOTIFICATION_ID, createNotification())
+                startForeground(NOTIFICATION_ID, notification)
             }
             startListening()
         } catch (e: Exception) {
