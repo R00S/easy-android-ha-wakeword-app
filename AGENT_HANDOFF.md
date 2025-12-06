@@ -128,7 +128,7 @@ implementation 'org.apache.commons:commons-math3:3.6.1'
 
 ## Known Limitations
 
-1. **Wake Word Model** - Currently using "hey_nugget" model renamed to "hey_mycroft". **Say "Hey Nugget"** to trigger detection (not "Hey Mycroft"). A proper "Hey Mycroft" trained model would be more accurate.
+1. **Wake Word Model** - Now uses the official "hey_mycroft_v0.1.onnx" model from OpenWakeWord. **Say "Hey Mycroft"** to trigger detection.
 
 2. **No Model Customization** - Users cannot choose different wake words without bundling new models.
 

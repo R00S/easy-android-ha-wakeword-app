@@ -294,7 +294,7 @@ The app bundles the **"Hey Mycroft"** wake word model from [OpenWakeWord](https:
 
 **Model details:**
 - Wake word: "Hey Mycroft"
-- Detection threshold: 0.5
+- Detection threshold: 0.05
 - Processing: Real-time (80ms chunks)
 - Framework: ONNX Runtime
 
