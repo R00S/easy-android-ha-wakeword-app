@@ -57,6 +57,10 @@ class WakeWordService : Service() {
         const val EXTRA_AUDIO_LEVEL = "audio_level"
         const val EXTRA_PREDICTION_SCORE = "prediction_score"
         
+        // Broadcast action for service errors
+        const val ACTION_SERVICE_ERROR = "com.roos.easywakeword.SERVICE_ERROR"
+        const val EXTRA_ERROR_MESSAGE = "error_message"
+        
         // Track service running state
         @Volatile
         private var serviceRunning = false
@@ -94,6 +98,7 @@ class WakeWordService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to create service", e)
             serviceRunning = false
+            broadcastError("Failed to create service: ${e.message}")
             stopSelf()
         }
     }
@@ -116,6 +121,7 @@ class WakeWordService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start foreground service", e)
             serviceRunning = false
+            broadcastError("Failed to start service: ${e.message}")
             stopSelf()
             return START_NOT_STICKY
         }
@@ -197,6 +203,7 @@ class WakeWordService : Service() {
             modelRunner?.close()
             modelRunner = null
             wakeWordModel = null
+            broadcastError("Failed to initialize wake word detection: ${e.message}")
             stopSelf()
         }
     }
@@ -317,6 +324,13 @@ class WakeWordService : Service() {
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
     }
     
+    private fun broadcastError(errorMessage: String) {
+        val intent = Intent(ACTION_SERVICE_ERROR).apply {
+            putExtra(EXTRA_ERROR_MESSAGE, errorMessage)
+        }
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+    }
+    
     private inner class AudioRecorderThread : Thread() {
         private var audioRecord: AudioRecord? = null
         @Volatile
@@ -352,12 +366,14 @@ class WakeWordService : Service() {
                 if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
                     Log.e(TAG, "AudioRecord failed to initialize - state: ${audioRecord?.state}")
                     serviceRunning = false
+                    broadcastError("Failed to initialize audio recording")
                     stopSelf()
                     return
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Exception during AudioRecord initialization", e)
                 serviceRunning = false
+                broadcastError("Audio recording error: ${e.message}")
                 stopSelf()
                 return
             }
@@ -370,6 +386,7 @@ class WakeWordService : Service() {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start audio recording", e)
                 serviceRunning = false
+                broadcastError("Failed to start recording: ${e.message}")
                 stopSelf()
                 releaseResources()
                 return
