@@ -49,16 +49,22 @@ class OnnxModelRunner(private val assetManager: AssetManager) {
         private const val MEL_SPEC_OFFSET = 2.0f
     }
     
-    private val ortEnv: OrtEnvironment = OrtEnvironment.getEnvironment()
+    private val ortEnv: OrtEnvironment
     private var wakeWordSession: OrtSession? = null
     
     init {
         try {
+            Log.d(TAG, "Initializing ONNX Runtime environment...")
+            ortEnv = OrtEnvironment.getEnvironment()
+            
+            Log.d(TAG, "Loading wake word model...")
             val modelBytes = readModelFile("hey_mycroft.onnx")
+            Log.d(TAG, "Creating ONNX session (${modelBytes.size} bytes)...")
             wakeWordSession = ortEnv.createSession(modelBytes)
-            Log.d(TAG, "Wake word model loaded successfully (${modelBytes.size} bytes)")
+            Log.d(TAG, "Wake word model loaded successfully")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load wake word model: ${e.message}", e)
+            Log.e(TAG, "Failed to initialize ONNX model runner: ${e.message}", e)
+            throw RuntimeException("Failed to initialize wake word model", e)
         }
     }
     

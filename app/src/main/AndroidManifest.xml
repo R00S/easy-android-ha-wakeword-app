@@ -10,7 +10,8 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Foreground service permission -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- Microphone foreground service type is only available on Android 11+ (API 30+) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" android:minSdkVersion="30" />
 
     <application
         android:allowBackup="true"
@@ -32,10 +33,12 @@
         </activity>
 
         <!-- Wake Word Detection Service -->
+        <!-- foregroundServiceType is only available on Android 10+ (API 29+), but microphone type requires API 30+ -->
         <service
             android:name=".wakeword.WakeWordService"
             android:exported="false"
-            android:foregroundServiceType="microphone" />
+            android:foregroundServiceType="microphone"
+            tools:targetApi="r" />
 
         <!-- FileProvider for sharing assets to other apps -->
         <provider

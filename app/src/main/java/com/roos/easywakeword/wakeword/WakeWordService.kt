@@ -9,6 +9,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -86,15 +87,38 @@ class WakeWordService : Service() {
     
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "Service created")
-        serviceRunning = true
-        createNotificationChannel()
+        Log.d(TAG, "Service created (Android API ${Build.VERSION.SDK_INT})")
+        try {
+            createNotificationChannel()
+            serviceRunning = true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create service", e)
+            serviceRunning = false
+            stopSelf()
+        }
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "Service started")
-        startForeground(NOTIFICATION_ID, createNotification())
-        startListening()
+        try {
+            // Android 10 (API 29) and below: Use startForeground without service type
+            // Android 11 (API 30) and above: Use startForeground with FOREGROUND_SERVICE_TYPE_MICROPHONE
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                startForeground(
+                    NOTIFICATION_ID, 
+                    createNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, createNotification())
+            }
+            startListening()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start foreground service", e)
+            serviceRunning = false
+            stopSelf()
+            return START_NOT_STICKY
+        }
         return START_STICKY
     }
     
@@ -147,21 +171,32 @@ class WakeWordService : Service() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) 
             != PackageManager.PERMISSION_GRANTED) {
             Log.e(TAG, "RECORD_AUDIO permission not granted")
+            serviceRunning = false
             stopSelf()
             return
         }
         
         try {
+            Log.d(TAG, "Initializing ONNX models...")
             modelRunner = OnnxModelRunner(assets)
+            
+            Log.d(TAG, "Creating wake word model...")
             wakeWordModel = WakeWordModel(modelRunner!!)
             
+            Log.d(TAG, "Starting audio recorder thread...")
             audioRecorderThread = AudioRecorderThread()
             audioRecorderThread?.start()
             isListening = true
             
-            Log.d(TAG, "Wake word detection started")
+            Log.d(TAG, "Wake word detection started successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start wake word detection", e)
+            // Clean up on failure
+            isListening = false
+            serviceRunning = false
+            modelRunner?.close()
+            modelRunner = null
+            wakeWordModel = null
             stopSelf()
         }
     }
@@ -293,28 +328,52 @@ class WakeWordService : Service() {
         override fun run() {
             Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
             
-            val minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
-            val bufferSize = maxOf(minBufferSize, BUFFER_SIZE_IN_SHORTS * 2)
-            
-            // Use VOICE_RECOGNITION audio source for better far-field audio capture
-            // This typically uses the best available microphone for voice input
-            audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
-                SAMPLE_RATE,
-                CHANNEL_CONFIG,
-                AUDIO_FORMAT,
-                bufferSize
-            )
-            
-            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                Log.e(TAG, "AudioRecord failed to initialize")
+            try {
+                val minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
+                if (minBufferSize == AudioRecord.ERROR || minBufferSize == AudioRecord.ERROR_BAD_VALUE) {
+                    Log.e(TAG, "AudioRecord.getMinBufferSize failed with error code: $minBufferSize")
+                    serviceRunning = false
+                    stopSelf()
+                    return
+                }
+                
+                val bufferSize = maxOf(minBufferSize, BUFFER_SIZE_IN_SHORTS * 2)
+                
+                // Use VOICE_RECOGNITION audio source for better far-field audio capture
+                // This typically uses the best available microphone for voice input
+                audioRecord = AudioRecord(
+                    MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                    SAMPLE_RATE,
+                    CHANNEL_CONFIG,
+                    AUDIO_FORMAT,
+                    bufferSize
+                )
+                
+                if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                    Log.e(TAG, "AudioRecord failed to initialize - state: ${audioRecord?.state}")
+                    serviceRunning = false
+                    stopSelf()
+                    return
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception during AudioRecord initialization", e)
+                serviceRunning = false
+                stopSelf()
                 return
             }
             
             val audioBuffer = ShortArray(BUFFER_SIZE_IN_SHORTS)
-            audioRecord?.startRecording()
             
-            Log.d(TAG, "Audio recording started with VOICE_RECOGNITION source")
+            try {
+                audioRecord?.startRecording()
+                Log.d(TAG, "Audio recording started with VOICE_RECOGNITION source")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start audio recording", e)
+                serviceRunning = false
+                stopSelf()
+                releaseResources()
+                return
+            }
             
             while (recording && isListening) {
                 val readResult = audioRecord?.read(audioBuffer, 0, audioBuffer.size) ?: 0
