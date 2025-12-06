@@ -198,17 +198,19 @@ class WakeWordService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start wake word detection", e)
             // Clean up on failure
-            isListening = false
+            cleanupResources()
             serviceRunning = false
-            modelRunner?.close()
-            modelRunner = null
-            wakeWordModel = null
             broadcastError("Failed to initialize wake word detection: ${e.message}")
             stopSelf()
         }
     }
     
     private fun stopListening() {
+        cleanupResources()
+        Log.d(TAG, "Wake word detection stopped")
+    }
+    
+    private fun cleanupResources() {
         isListening = false
         audioRecorderThread?.stopRecording()
         audioRecorderThread = null
@@ -216,8 +218,6 @@ class WakeWordService : Service() {
         modelRunner?.close()
         modelRunner = null
         wakeWordModel = null
-        
-        Log.d(TAG, "Wake word detection stopped")
     }
     
     private fun onWakeWordDetected() {
