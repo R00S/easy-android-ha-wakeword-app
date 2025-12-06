@@ -28,14 +28,6 @@
 
 > 💡 You may need to enable "Install from unknown sources" in your Android settings to install the APK.
 
-### First Release Setup
-
-To create the first release with the APK:
-1. Go to **Actions** tab → **Build and Release APK** → **Run workflow**
-2. Or push a version tag: `git tag v1.0.0 && git push origin v1.0.0`
-
-The workflow will automatically build and attach the APK to the release.
-
 ---
 
 ## 🎯 What This Does
