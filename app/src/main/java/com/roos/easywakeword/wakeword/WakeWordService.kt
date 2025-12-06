@@ -44,6 +44,13 @@ class WakeWordService : Service() {
         private const val DETECTION_THRESHOLD = 0.05f
         private const val HOME_ASSISTANT_PACKAGE = "io.homeassistant.companion.android"
         
+        // Cooldown period to prevent rapid-fire launches
+        // 3 seconds is chosen because:
+        // - Wake word score can remain elevated for multiple consecutive frames
+        // - Android may throttle or reject rapid intent launches
+        // - Users typically need a moment to formulate their voice command after saying the wake word
+        private const val LAUNCH_COOLDOWN_MS = 3000L
+        
         // Broadcast action for audio level updates
         const val ACTION_AUDIO_LEVEL = "com.roos.easywakeword.AUDIO_LEVEL"
         const val EXTRA_AUDIO_LEVEL = "audio_level"
@@ -75,6 +82,7 @@ class WakeWordService : Service() {
     private var wakeWordModel: WakeWordModel? = null
     private var audioRecorderThread: AudioRecorderThread? = null
     private var isListening = false
+    private var lastLaunchTime = 0L
     
     override fun onCreate() {
         super.onCreate()
@@ -171,21 +179,62 @@ class WakeWordService : Service() {
     }
     
     private fun onWakeWordDetected() {
+        // Check cooldown to prevent rapid-fire launches
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastLaunchTime < LAUNCH_COOLDOWN_MS) {
+            Log.d(TAG, "Wake word detected but within cooldown period, ignoring")
+            return
+        }
+        
         Log.i(TAG, "Wake word detected! Launching Home Assistant Assist")
+        lastLaunchTime = currentTime
         launchHomeAssistantAssist()
     }
     
     private fun launchHomeAssistantAssist() {
         try {
-            // Try to launch Home Assistant Assist directly
-            val assistIntent = Intent().apply {
-                action = "android.intent.action.ASSIST"
+            // Method 1: Launch AssistActivity directly with explicit component
+            val assistIntent = Intent(Intent.ACTION_ASSIST).apply {
+                setClassName(HOME_ASSISTANT_PACKAGE, "$HOME_ASSISTANT_PACKAGE.assist.AssistActivity")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+            
+            if (assistIntent.resolveActivity(packageManager) != null) {
+                Log.d(TAG, "Launching Assist via explicit component")
+                startActivity(assistIntent)
+                return
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to launch via explicit AssistActivity", e)
+        }
+        
+        try {
+            // Method 2: Use VOICE_COMMAND action (alternative intent for Assist)
+            val voiceCommandIntent = Intent("android.intent.action.VOICE_COMMAND").apply {
                 setPackage(HOME_ASSISTANT_PACKAGE)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             
-            if (assistIntent.resolveActivity(packageManager) != null) {
-                startActivity(assistIntent)
+            if (voiceCommandIntent.resolveActivity(packageManager) != null) {
+                Log.d(TAG, "Launching Assist via VOICE_COMMAND")
+                startActivity(voiceCommandIntent)
+                return
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to launch via VOICE_COMMAND action", e)
+        }
+        
+        try {
+            // Method 3: Use generic ASSIST action with package filter
+            val genericAssistIntent = Intent(Intent.ACTION_ASSIST).apply {
+                setPackage(HOME_ASSISTANT_PACKAGE)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            
+            if (genericAssistIntent.resolveActivity(packageManager) != null) {
+                Log.d(TAG, "Launching Assist via generic ASSIST action")
+                startActivity(genericAssistIntent)
                 return
             }
         } catch (e: Exception) {
@@ -193,7 +242,7 @@ class WakeWordService : Service() {
         }
         
         try {
-            // Try the Home Assistant deep link for Assist
+            // Method 4: Try the Home Assistant deep link for Assist
             val deepLinkIntent = Intent(Intent.ACTION_VIEW).apply {
                 data = Uri.parse("homeassistant://navigate/assist")
                 setPackage(HOME_ASSISTANT_PACKAGE)
@@ -201,6 +250,7 @@ class WakeWordService : Service() {
             }
             
             if (deepLinkIntent.resolveActivity(packageManager) != null) {
+                Log.d(TAG, "Launching Assist via deep link")
                 startActivity(deepLinkIntent)
                 return
             }
@@ -213,6 +263,7 @@ class WakeWordService : Service() {
             val launchIntent = packageManager.getLaunchIntentForPackage(HOME_ASSISTANT_PACKAGE)
             if (launchIntent != null) {
                 launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                Log.d(TAG, "Launching Home Assistant main app as fallback")
                 startActivity(launchIntent)
                 return
             }
@@ -220,7 +271,7 @@ class WakeWordService : Service() {
             Log.w(TAG, "Failed to launch Home Assistant app", e)
         }
         
-        Log.e(TAG, "Could not launch Home Assistant")
+        Log.e(TAG, "Could not launch Home Assistant - app may not be installed")
     }
     
     private fun broadcastAudioLevel(audioLevel: Float, predictionScore: Float) {
