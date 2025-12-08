@@ -140,18 +140,27 @@ class WakeWordService : Service() {
             
             // Move initialization to background thread to prevent blocking service start
             // This is critical for Android 10+ to avoid ForegroundServiceDidNotStartInTimeException
-            initExecutor.execute {
-                try {
-                    startListening()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to start listening in background thread", e)
-                    // Post service lifecycle operations to main thread to avoid race conditions
-                    mainHandler.post {
-                        serviceRunning = false
-                        broadcastError("Failed to start wake word detection: ${e.message}")
-                        stopSelf()
+            try {
+                initExecutor.execute {
+                    try {
+                        startListening()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to start listening in background thread", e)
+                        // Post service lifecycle operations to main thread to avoid race conditions
+                        mainHandler.post {
+                            serviceRunning = false
+                            broadcastError("Failed to start wake word detection: ${e.message}")
+                            stopSelf()
+                        }
                     }
                 }
+            } catch (e: java.util.concurrent.RejectedExecutionException) {
+                // Executor was shut down before we could submit the task
+                Log.e(TAG, "Executor rejected task - service may be shutting down", e)
+                serviceRunning = false
+                broadcastError("Failed to start service: ${e.message}")
+                stopSelf()
+                return START_NOT_STICKY
             }
             
         } catch (e: Exception) {
@@ -170,11 +179,21 @@ class WakeWordService : Service() {
         serviceRunning = false
         stopListening()
         
-        // Shutdown the executor without blocking the main thread
-        // Use shutdownNow() for immediate termination to avoid ANR
-        val notTerminatedTasks = initExecutor.shutdownNow()
-        if (notTerminatedTasks.isNotEmpty()) {
-            Log.d(TAG, "Interrupted ${notTerminatedTasks.size} pending initialization task(s)")
+        // Shutdown the executor with a very brief timeout to allow graceful completion
+        // but avoid blocking main thread for too long (ANR risk)
+        initExecutor.shutdown()
+        try {
+            if (!initExecutor.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                Log.w(TAG, "Executor did not terminate within timeout, forcing shutdown")
+                val notTerminatedTasks = initExecutor.shutdownNow()
+                if (notTerminatedTasks.isNotEmpty()) {
+                    Log.d(TAG, "Interrupted ${notTerminatedTasks.size} pending task(s)")
+                }
+            }
+        } catch (e: InterruptedException) {
+            Log.w(TAG, "Interrupted while waiting for executor termination", e)
+            initExecutor.shutdownNow()
+            Thread.currentThread().interrupt()
         }
     }
     
@@ -227,11 +246,14 @@ class WakeWordService : Service() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) 
             != PackageManager.PERMISSION_GRANTED) {
             Log.e(TAG, "RECORD_AUDIO permission not granted")
-            serviceRunning = false
             synchronized(initializationLock) {
                 isInitializing = false
             }
-            stopSelf()
+            // Post service lifecycle operations to main thread for consistency
+            mainHandler.post {
+                serviceRunning = false
+                stopSelf()
+            }
             return
         }
         
