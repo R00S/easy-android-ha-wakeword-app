@@ -86,8 +86,11 @@ class WakeWordService : Service() {
     private var modelRunner: OnnxModelRunner? = null
     private var wakeWordModel: WakeWordModel? = null
     private var audioRecorderThread: AudioRecorderThread? = null
+    @Volatile
     private var isListening = false
     private var lastLaunchTime = 0L
+    @Volatile
+    private var isInitializing = false
     
     override fun onCreate() {
         super.onCreate()
@@ -118,7 +121,20 @@ class WakeWordService : Service() {
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
-            startListening()
+            
+            // Move initialization to background thread to prevent blocking service start
+            // This is critical for Android 10+ to avoid ForegroundServiceDidNotStartInTimeException
+            Thread {
+                try {
+                    startListening()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to start listening in background thread", e)
+                    serviceRunning = false
+                    broadcastError("Failed to start wake word detection: ${e.message}")
+                    stopSelf()
+                }
+            }.start()
+            
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start foreground service", e)
             serviceRunning = false
@@ -173,12 +189,20 @@ class WakeWordService : Service() {
     }
     
     private fun startListening() {
-        if (isListening) return
+        // Prevent concurrent initialization
+        synchronized(this) {
+            if (isListening || isInitializing) {
+                Log.d(TAG, "Already listening or initializing, skipping")
+                return
+            }
+            isInitializing = true
+        }
         
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) 
             != PackageManager.PERMISSION_GRANTED) {
             Log.e(TAG, "RECORD_AUDIO permission not granted")
             serviceRunning = false
+            isInitializing = false
             stopSelf()
             return
         }
@@ -193,12 +217,19 @@ class WakeWordService : Service() {
             Log.d(TAG, "Starting audio recorder thread...")
             audioRecorderThread = AudioRecorderThread()
             audioRecorderThread?.start()
-            isListening = true
+            
+            synchronized(this) {
+                isListening = true
+                isInitializing = false
+            }
             
             Log.d(TAG, "Wake word detection started successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start wake word detection", e)
             // Clean up on failure
+            synchronized(this) {
+                isInitializing = false
+            }
             cleanupResources()
             serviceRunning = false
             broadcastError("Failed to initialize wake word detection: ${e.message}")
@@ -212,7 +243,10 @@ class WakeWordService : Service() {
     }
     
     private fun cleanupResources() {
-        isListening = false
+        synchronized(this) {
+            isListening = false
+            isInitializing = false
+        }
         audioRecorderThread?.stopRecording()
         audioRecorderThread = null
         
