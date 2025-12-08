@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.roos.easywakeword.R
 import com.roos.easywakeword.SetupWizardActivity
+import java.util.concurrent.Executors
 import kotlin.math.log10
 import kotlin.math.sqrt
 
@@ -63,7 +64,8 @@ class WakeWordService : Service() {
         
         // Track service running state
         @Volatile
-        private var serviceRunning = false
+        var serviceRunning = false
+            private set
         
         fun start(context: Context) {
             val intent = Intent(context, WakeWordService::class.java)
@@ -91,6 +93,12 @@ class WakeWordService : Service() {
     private var lastLaunchTime = 0L
     @Volatile
     private var isInitializing = false
+    
+    // Private lock object for thread synchronization to avoid deadlocks
+    private val initializationLock = Object()
+    
+    // Executor for background initialization to prevent blocking service start
+    private val initExecutor = Executors.newSingleThreadExecutor()
     
     override fun onCreate() {
         super.onCreate()
@@ -124,7 +132,7 @@ class WakeWordService : Service() {
             
             // Move initialization to background thread to prevent blocking service start
             // This is critical for Android 10+ to avoid ForegroundServiceDidNotStartInTimeException
-            Thread {
+            initExecutor.execute {
                 try {
                     startListening()
                 } catch (e: Exception) {
@@ -133,7 +141,7 @@ class WakeWordService : Service() {
                     broadcastError("Failed to start wake word detection: ${e.message}")
                     stopSelf()
                 }
-            }.start()
+            }
             
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start foreground service", e)
@@ -150,6 +158,9 @@ class WakeWordService : Service() {
         Log.d(TAG, "Service destroyed")
         serviceRunning = false
         stopListening()
+        
+        // Shutdown the executor to prevent resource leaks
+        initExecutor.shutdownNow()
     }
     
     override fun onBind(intent: Intent?): IBinder? = null
@@ -190,7 +201,7 @@ class WakeWordService : Service() {
     
     private fun startListening() {
         // Prevent concurrent initialization
-        synchronized(this) {
+        synchronized(initializationLock) {
             if (isListening || isInitializing) {
                 Log.d(TAG, "Already listening or initializing, skipping")
                 return
@@ -218,7 +229,7 @@ class WakeWordService : Service() {
             audioRecorderThread = AudioRecorderThread()
             audioRecorderThread?.start()
             
-            synchronized(this) {
+            synchronized(initializationLock) {
                 isListening = true
                 isInitializing = false
             }
@@ -227,7 +238,7 @@ class WakeWordService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start wake word detection", e)
             // Clean up on failure
-            synchronized(this) {
+            synchronized(initializationLock) {
                 isInitializing = false
             }
             cleanupResources()
@@ -243,7 +254,7 @@ class WakeWordService : Service() {
     }
     
     private fun cleanupResources() {
-        synchronized(this) {
+        synchronized(initializationLock) {
             isListening = false
             isInitializing = false
         }
