@@ -15,7 +15,9 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.Process
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -24,6 +26,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.roos.easywakeword.R
 import com.roos.easywakeword.SetupWizardActivity
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.math.log10
 import kotlin.math.sqrt
 
@@ -101,6 +104,9 @@ class WakeWordService : Service() {
     // Executor for background initialization to prevent blocking service start
     private val initExecutor = Executors.newSingleThreadExecutor()
     
+    // Handler for posting back to main thread from background tasks
+    private val mainHandler = Handler(Looper.getMainLooper())
+    
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "Service created (Android API ${Build.VERSION.SDK_INT})")
@@ -138,9 +144,12 @@ class WakeWordService : Service() {
                     startListening()
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to start listening in background thread", e)
-                    serviceRunning = false
-                    broadcastError("Failed to start wake word detection: ${e.message}")
-                    stopSelf()
+                    // Post service lifecycle operations to main thread to avoid race conditions
+                    mainHandler.post {
+                        serviceRunning = false
+                        broadcastError("Failed to start wake word detection: ${e.message}")
+                        stopSelf()
+                    }
                 }
             }
             
@@ -160,8 +169,18 @@ class WakeWordService : Service() {
         serviceRunning = false
         stopListening()
         
-        // Shutdown the executor to prevent resource leaks
-        initExecutor.shutdownNow()
+        // Shutdown the executor gracefully, then forcefully if needed
+        try {
+            initExecutor.shutdown()
+            if (!initExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
+                Log.w(TAG, "Executor did not terminate gracefully, forcing shutdown")
+                initExecutor.shutdownNow()
+            }
+        } catch (e: InterruptedException) {
+            Log.w(TAG, "Interrupted while shutting down executor", e)
+            initExecutor.shutdownNow()
+            Thread.currentThread().interrupt()
+        }
     }
     
     override fun onBind(intent: Intent?): IBinder? = null
@@ -245,9 +264,12 @@ class WakeWordService : Service() {
                 isInitializing = false
             }
             cleanupResources()
-            serviceRunning = false
-            broadcastError("Failed to initialize wake word detection: ${e.message}")
-            stopSelf()
+            // Post service lifecycle operations to main thread to avoid race conditions
+            mainHandler.post {
+                serviceRunning = false
+                broadcastError("Failed to initialize wake word detection: ${e.message}")
+                stopSelf()
+            }
         }
     }
     
