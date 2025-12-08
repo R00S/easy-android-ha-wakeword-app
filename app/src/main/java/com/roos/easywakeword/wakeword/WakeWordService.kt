@@ -15,7 +15,9 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.Process
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -23,6 +25,8 @@ import androidx.core.content.ContextCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.roos.easywakeword.R
 import com.roos.easywakeword.SetupWizardActivity
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.math.log10
 import kotlin.math.sqrt
 
@@ -62,8 +66,11 @@ class WakeWordService : Service() {
         const val EXTRA_ERROR_MESSAGE = "error_message"
         
         // Track service running state
+        // @Volatile ensures thread-safe visibility without synchronization overhead
+        // Internal visibility for companion object access only
         @Volatile
-        private var serviceRunning = false
+        internal var serviceRunning = false
+            private set
         
         fun start(context: Context) {
             val intent = Intent(context, WakeWordService::class.java)
@@ -86,8 +93,22 @@ class WakeWordService : Service() {
     private var modelRunner: OnnxModelRunner? = null
     private var wakeWordModel: WakeWordModel? = null
     private var audioRecorderThread: AudioRecorderThread? = null
+    @Volatile
     private var isListening = false
     private var lastLaunchTime = 0L
+    @Volatile
+    private var isInitializing = false
+    @Volatile
+    private var isShuttingDown = false
+    
+    // Private lock object for thread synchronization to avoid deadlocks
+    private val initializationLock = Object()
+    
+    // Executor for background initialization to prevent blocking service start
+    private val initExecutor = Executors.newSingleThreadExecutor()
+    
+    // Handler for posting back to main thread from background tasks
+    private val mainHandler = Handler(Looper.getMainLooper())
     
     override fun onCreate() {
         super.onCreate()
@@ -118,7 +139,32 @@ class WakeWordService : Service() {
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
-            startListening()
+            
+            // Move initialization to background thread to prevent blocking service start
+            // This is critical for Android 10+ to avoid ForegroundServiceDidNotStartInTimeException
+            try {
+                initExecutor.execute {
+                    try {
+                        startListening()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to start listening in background thread", e)
+                        // Post service lifecycle operations to main thread to avoid race conditions
+                        mainHandler.post {
+                            serviceRunning = false
+                            broadcastError("Failed to start wake word detection: ${e.message}")
+                            stopSelf()
+                        }
+                    }
+                }
+            } catch (e: java.util.concurrent.RejectedExecutionException) {
+                // Executor was shut down before we could submit the task
+                Log.e(TAG, "Executor rejected task - service may be shutting down", e)
+                serviceRunning = false
+                broadcastError("Failed to start service: ${e.message}")
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start foreground service", e)
             serviceRunning = false
@@ -131,9 +177,36 @@ class WakeWordService : Service() {
     
     override fun onDestroy() {
         super.onDestroy()
+        
+        // Defensive guard: ensure shutdown only happens once
+        if (isShuttingDown) {
+            Log.d(TAG, "Service already shutting down, skipping")
+            return
+        }
+        isShuttingDown = true
+        
         Log.d(TAG, "Service destroyed")
         serviceRunning = false
         stopListening()
+        
+        // Shutdown the executor with a very brief timeout to allow graceful completion
+        // but avoid blocking main thread for too long (ANR risk)
+        if (!initExecutor.isShutdown) {
+            initExecutor.shutdown()
+            try {
+                if (!initExecutor.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                    Log.w(TAG, "Executor did not terminate within timeout, forcing shutdown")
+                    val notTerminatedTasks = initExecutor.shutdownNow()
+                    if (notTerminatedTasks.isNotEmpty()) {
+                        Log.d(TAG, "Interrupted ${notTerminatedTasks.size} pending task(s)")
+                    }
+                }
+            } catch (e: InterruptedException) {
+                Log.w(TAG, "Interrupted while waiting for executor termination", e)
+                initExecutor.shutdownNow()
+                Thread.currentThread().interrupt()
+            }
+        }
     }
     
     override fun onBind(intent: Intent?): IBinder? = null
@@ -173,13 +246,26 @@ class WakeWordService : Service() {
     }
     
     private fun startListening() {
-        if (isListening) return
+        // Prevent concurrent initialization
+        synchronized(initializationLock) {
+            if (isListening || isInitializing) {
+                Log.d(TAG, "Already listening or initializing, skipping")
+                return
+            }
+            isInitializing = true
+        }
         
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) 
             != PackageManager.PERMISSION_GRANTED) {
             Log.e(TAG, "RECORD_AUDIO permission not granted")
-            serviceRunning = false
-            stopSelf()
+            synchronized(initializationLock) {
+                isInitializing = false
+            }
+            // Post service lifecycle operations to main thread for consistency
+            mainHandler.post {
+                serviceRunning = false
+                stopSelf()
+            }
             return
         }
         
@@ -193,16 +279,26 @@ class WakeWordService : Service() {
             Log.d(TAG, "Starting audio recorder thread...")
             audioRecorderThread = AudioRecorderThread()
             audioRecorderThread?.start()
-            isListening = true
+            
+            synchronized(initializationLock) {
+                isListening = true
+                isInitializing = false
+            }
             
             Log.d(TAG, "Wake word detection started successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start wake word detection", e)
             // Clean up on failure
+            synchronized(initializationLock) {
+                isInitializing = false
+            }
             cleanupResources()
-            serviceRunning = false
-            broadcastError("Failed to initialize wake word detection: ${e.message}")
-            stopSelf()
+            // Post service lifecycle operations to main thread to avoid race conditions
+            mainHandler.post {
+                serviceRunning = false
+                broadcastError("Failed to initialize wake word detection: ${e.message}")
+                stopSelf()
+            }
         }
     }
     
@@ -212,7 +308,10 @@ class WakeWordService : Service() {
     }
     
     private fun cleanupResources() {
-        isListening = false
+        synchronized(initializationLock) {
+            isListening = false
+            isInitializing = false
+        }
         audioRecorderThread?.stopRecording()
         audioRecorderThread = null
         
