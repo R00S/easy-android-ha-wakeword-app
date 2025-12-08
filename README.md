@@ -18,15 +18,27 @@
 
 ## 📥 Download
 
+### Proof of Concept Build (Stable on Android 13+)
+
 <p align="center">
-  <a href="https://github.com/R00S/easy-android-ha-wakeword-app/releases/latest/download/easy-wakeword.apk">
-    <img src="https://img.shields.io/badge/Download-APK-brightgreen?style=for-the-badge&logo=android" alt="Download APK"/>
+  <a href="https://github.com/R00S/easy-android-ha-wakeword-app/releases/download/v1.0.0-poc/easy-wakeword.apk">
+    <img src="https://img.shields.io/badge/Download-Proof%20of%20Concept%20APK-blue?style=for-the-badge&logo=android" alt="Download Proof of Concept APK"/>
   </a>
 </p>
 
-**[⬇️ Download Latest APK](https://github.com/R00S/easy-android-ha-wakeword-app/releases/latest/download/easy-wakeword.apk)** | **[All Releases](https://github.com/R00S/easy-android-ha-wakeword-app/releases)**
+**[⬇️ Download Proof of Concept APK (v1.0.0-poc)](https://github.com/R00S/easy-android-ha-wakeword-app/releases/download/v1.0.0-poc/easy-wakeword.apk)**
 
+> 🧪 **Proof of Concept Release for Public Testing**
+> 
+> This build is confirmed working on **Android 13 and Android 14** devices. This release is preserved for public testing and demonstration purposes.
+>
+> ⚠️ **Known Issue:** Crashes on Android 10 devices. An Android 10 compatibility fix is in development.
+> 
 > 💡 You may need to enable "Install from unknown sources" in your Android settings to install the APK.
+
+---
+
+**[All Releases](https://github.com/R00S/easy-android-ha-wakeword-app/releases)** | **[Latest Development Builds](https://github.com/R00S/easy-android-ha-wakeword-app/releases/latest)**
 
 ---
 

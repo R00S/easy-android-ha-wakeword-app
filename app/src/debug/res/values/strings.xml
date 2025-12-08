@@ -1,0 +1,4 @@
+<resources>
+    <!-- Debug build app name to distinguish from release -->
+    <string name="app_name">Easy HA Wakeword (Test)</string>
+</resources>

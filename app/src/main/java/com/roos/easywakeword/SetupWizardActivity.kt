@@ -36,10 +36,18 @@ class SetupWizardActivity : AppCompatActivity() {
     // Broadcast receiver for audio level updates from the service
     private val audioLevelReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == WakeWordService.ACTION_AUDIO_LEVEL) {
-                val audioLevel = intent.getFloatExtra(WakeWordService.EXTRA_AUDIO_LEVEL, 0f)
-                val predictionScore = intent.getFloatExtra(WakeWordService.EXTRA_PREDICTION_SCORE, 0f)
-                updateAudioLevelUI(audioLevel, predictionScore)
+            when (intent?.action) {
+                WakeWordService.ACTION_AUDIO_LEVEL -> {
+                    val audioLevel = intent.getFloatExtra(WakeWordService.EXTRA_AUDIO_LEVEL, 0f)
+                    val predictionScore = intent.getFloatExtra(WakeWordService.EXTRA_PREDICTION_SCORE, 0f)
+                    updateAudioLevelUI(audioLevel, predictionScore)
+                }
+                WakeWordService.ACTION_SERVICE_ERROR -> {
+                    val errorMessage = intent.getStringExtra(WakeWordService.EXTRA_ERROR_MESSAGE) ?: "Unknown error"
+                    Log.e("SetupWizardActivity", "Service error: $errorMessage")
+                    showError(R.string.error_service_failed)
+                    updateStepUI()
+                }
             }
         }
     }
@@ -72,10 +80,14 @@ class SetupWizardActivity : AppCompatActivity() {
         super.onResume()
         // Update UI in case permissions or service state changed
         updateStepUI()
-        // Register for audio level updates
+        // Register for audio level updates and service errors
+        val intentFilter = IntentFilter().apply {
+            addAction(WakeWordService.ACTION_AUDIO_LEVEL)
+            addAction(WakeWordService.ACTION_SERVICE_ERROR)
+        }
         LocalBroadcastManager.getInstance(this).registerReceiver(
             audioLevelReceiver,
-            IntentFilter(WakeWordService.ACTION_AUDIO_LEVEL)
+            intentFilter
         )
     }
     
