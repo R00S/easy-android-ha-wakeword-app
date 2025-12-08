@@ -98,6 +98,8 @@ class WakeWordService : Service() {
     private var lastLaunchTime = 0L
     @Volatile
     private var isInitializing = false
+    @Volatile
+    private var isShuttingDown = false
     
     // Private lock object for thread synchronization to avoid deadlocks
     private val initializationLock = Object()
@@ -175,25 +177,35 @@ class WakeWordService : Service() {
     
     override fun onDestroy() {
         super.onDestroy()
+        
+        // Defensive guard: ensure shutdown only happens once
+        if (isShuttingDown) {
+            Log.d(TAG, "Service already shutting down, skipping")
+            return
+        }
+        isShuttingDown = true
+        
         Log.d(TAG, "Service destroyed")
         serviceRunning = false
         stopListening()
         
         // Shutdown the executor with a very brief timeout to allow graceful completion
         // but avoid blocking main thread for too long (ANR risk)
-        initExecutor.shutdown()
-        try {
-            if (!initExecutor.awaitTermination(500, TimeUnit.MILLISECONDS)) {
-                Log.w(TAG, "Executor did not terminate within timeout, forcing shutdown")
-                val notTerminatedTasks = initExecutor.shutdownNow()
-                if (notTerminatedTasks.isNotEmpty()) {
-                    Log.d(TAG, "Interrupted ${notTerminatedTasks.size} pending task(s)")
+        if (!initExecutor.isShutdown) {
+            initExecutor.shutdown()
+            try {
+                if (!initExecutor.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                    Log.w(TAG, "Executor did not terminate within timeout, forcing shutdown")
+                    val notTerminatedTasks = initExecutor.shutdownNow()
+                    if (notTerminatedTasks.isNotEmpty()) {
+                        Log.d(TAG, "Interrupted ${notTerminatedTasks.size} pending task(s)")
+                    }
                 }
+            } catch (e: InterruptedException) {
+                Log.w(TAG, "Interrupted while waiting for executor termination", e)
+                initExecutor.shutdownNow()
+                Thread.currentThread().interrupt()
             }
-        } catch (e: InterruptedException) {
-            Log.w(TAG, "Interrupted while waiting for executor termination", e)
-            initExecutor.shutdownNow()
-            Thread.currentThread().interrupt()
         }
     }
     
