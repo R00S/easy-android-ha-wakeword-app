@@ -63,6 +63,7 @@ class WakeWordService : Service() {
         const val EXTRA_ERROR_MESSAGE = "error_message"
         
         // Track service running state
+        // @Volatile ensures thread-safe visibility without synchronization overhead
         @Volatile
         var serviceRunning = false
             private set
@@ -213,7 +214,9 @@ class WakeWordService : Service() {
             != PackageManager.PERMISSION_GRANTED) {
             Log.e(TAG, "RECORD_AUDIO permission not granted")
             serviceRunning = false
-            isInitializing = false
+            synchronized(initializationLock) {
+                isInitializing = false
+            }
             stopSelf()
             return
         }
