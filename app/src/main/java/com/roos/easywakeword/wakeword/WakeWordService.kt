@@ -67,8 +67,9 @@ class WakeWordService : Service() {
         
         // Track service running state
         // @Volatile ensures thread-safe visibility without synchronization overhead
+        // Internal visibility for companion object access only
         @Volatile
-        var serviceRunning = false
+        internal var serviceRunning = false
             private set
         
         fun start(context: Context) {
@@ -169,17 +170,11 @@ class WakeWordService : Service() {
         serviceRunning = false
         stopListening()
         
-        // Shutdown the executor gracefully, then forcefully if needed
-        try {
-            initExecutor.shutdown()
-            if (!initExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
-                Log.w(TAG, "Executor did not terminate gracefully, forcing shutdown")
-                initExecutor.shutdownNow()
-            }
-        } catch (e: InterruptedException) {
-            Log.w(TAG, "Interrupted while shutting down executor", e)
-            initExecutor.shutdownNow()
-            Thread.currentThread().interrupt()
+        // Shutdown the executor without blocking the main thread
+        // Use shutdownNow() for immediate termination to avoid ANR
+        val notTerminatedTasks = initExecutor.shutdownNow()
+        if (notTerminatedTasks.isNotEmpty()) {
+            Log.d(TAG, "Interrupted ${notTerminatedTasks.size} pending initialization task(s)")
         }
     }
     
