@@ -1,4 +1,6 @@
 # Easy Android HA Wakeword App
+This is a proof of concept of adding wake word functionality to home assistnt companion app. This functionality has since been included in the companion. You can still use this if you prefer it over changing settings in the companion when you want to activate a wake word, but it will not be developed further by me. As always, feel free to fork it if you want.
+
 
 > ⚠️ **TESTING PRE-RELEASE** ⚠️
 > 
